@@ -36,7 +36,7 @@ export class Input {
       return { x: (cx - r.left) / r.width * VIEW_W, y: (cy - r.top) / r.height * VIEW_H };
     };
     window.addEventListener('keydown', e => { if (KEYMAP[e.code]) { this._keys.add(KEYMAP[e.code]); e.preventDefault(); } });
-    window.addEventListener('keyup', e => this._keys.delete(KEYMAP[e.code]));
+    window.addEventListener('keyup', e => { if (KEYMAP[e.code]) this._keys.delete(KEYMAP[e.code]); });
     canvas.addEventListener('mousemove', e => Object.assign(this._mouse, toView(e.clientX, e.clientY)));
     canvas.addEventListener('mousedown', e => { this._mouse.down = true; this._clickQueue = true; Object.assign(this._mouse, toView(e.clientX, e.clientY)); });
     window.addEventListener('mouseup', () => { this._mouse.down = false; });
@@ -60,10 +60,11 @@ export class Input {
       }
     }, { passive: false });
     const endTouch = e => {
+      e.preventDefault(); // block synthesized mouse events double-firing clicks
       for (const t of e.changedTouches) this._touches.delete(t.identifier);
     };
-    canvas.addEventListener('touchend', endTouch);
-    canvas.addEventListener('touchcancel', endTouch);
+    canvas.addEventListener('touchend', endTouch, { passive: false });
+    canvas.addEventListener('touchcancel', endTouch, { passive: false });
   }
 
   setPlayerScreen(x, y) { this._playerScreen = { x, y }; }
