@@ -113,3 +113,15 @@ export class UpgradeMenu {
     drawText(ctx, `BANKED ${player.banked}`, 108, 214, '#9ff0f4');
   }
 }
+
+export function drawSticks(ctx, input) {
+  if (!input.touchMode) return;
+  for (const s of [input.sticks.left, input.sticks.right]) {
+    if (!s) continue;
+    ctx.strokeStyle = 'rgba(160,200,220,0.35)';
+    ctx.beginPath(); ctx.arc(s.ox, s.oy, 22, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(160,200,220,0.45)';
+    const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy) || 1, cl = Math.min(d, 22);
+    ctx.beginPath(); ctx.arc(s.ox + dx / d * cl, s.oy + dy / d * cl, 7, 0, Math.PI * 2); ctx.fill();
+  }
+}

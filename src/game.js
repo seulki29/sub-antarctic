@@ -10,7 +10,8 @@ import { Input } from './input.js';
 import { bakeSprites } from './sprites.js';
 import { Camera, drawBackground, drawTiles, drawDecor } from './render.js';
 import { Harpoons } from './harpoon.js';
-import { drawHud, drawBossBar, UpgradeMenu, drawText, textWidth } from './hud.js';
+import { drawHud, drawBossBar, UpgradeMenu, drawText, textWidth, drawSticks } from './hud.js';
+import { sfx } from './audio.js';
 
 export class GameScene {
   constructor(canvas) {
@@ -40,6 +41,7 @@ export class GameScene {
     this.relicDropped = false;
     this.deathTimer = 0;
     this.onClear = null;
+    this._lastHp = this.player.hp;
   }
 
   update(dt) {
@@ -49,14 +51,17 @@ export class GameScene {
       this.player.y + this.player.h / 2 - this.cam.y);
     this.input.update();
     if (this.menu.open) {
-      if (this.input.consumeClick())
-        this.menu.click(this.input.pointer.x, this.input.pointer.y, this.player);
+      if (this.input.consumeClick()) {
+        const r = this.menu.click(this.input.pointer.x, this.input.pointer.y, this.player);
+        if (r === 'bought') sfx.buy(); else if (r === null) sfx.denied();
+      }
       return; // pause world while menu open
     }
     if (this.deathTimer > 0) {
       this.deathTimer -= dt;
       if (this.deathTimer <= 0) {
         this.player.respawn();
+        this._lastHp = this.player.hp;
         if (this.bossActive && this.boss && !this.boss.dead) {
           // reset boss fight
           setGate(this.world, false);
@@ -82,6 +87,7 @@ export class GameScene {
     this.atBase = near(this.world.base, 24);
     if (this.atBase && !wasAtBase) {
       this.player.bank();
+      sfx.bank();
       this.player.setCheckpoint(this.world.base.x, this.world.base.y);
       if (this.player.hasRelic && this.onClear) { this.onClear(); return; }
       this.menu.open = true;
@@ -90,8 +96,10 @@ export class GameScene {
     if (this.input.firing) {
       const px = this.player.x + this.player.w / 2, py = this.player.y + this.player.h / 2;
       if (this.harpoons.tryFire(px + this.input.aim.x * 12, py + this.input.aim.y * 12,
-          this.input.aim, P.HARPOON_SPD, this.player.dmgValue(), this.player))
+          this.input.aim, P.HARPOON_SPD, this.player.dmgValue(), this.player)) {
         this.particles.spawnBubble(px, py);
+        sfx.shoot();
+      }
     }
     this.harpoons.update(dt, this.world);
 
@@ -107,6 +115,7 @@ export class GameScene {
         hit.dead = true;
         e.takeDamage(hit.dmg);
         this.particles.spawnSpark(e.x + e.w / 2, e.y + e.h / 2, '#ffb0a0');
+        sfx.hit();
       }
     }
     this.enemies = this.enemies.filter(e => !e.dead);
@@ -131,8 +140,10 @@ export class GameScene {
           hit.dead = true;
           this.boss.takeDamage(hit.dmg);
           this.particles.spawnSpark(hit.x, hit.y, '#ffd0a0', 10);
+          sfx.hit();
         }
         if (this.boss.dead) {
+          sfx.boom();
           setGate(this.world, false);
           this.bossActive = false;
           if (!this.relicDropped) {
@@ -171,6 +182,7 @@ export class GameScene {
         if (pk.kind === 'crystal') pr.pickupCrystal(1);
         else pr.hasRelic = true;
         this.particles.spawnSpark(pk.x, pk.y, '#b8f8fa');
+        sfx.pickup();
         return false;
       }
       return true;
@@ -186,6 +198,8 @@ export class GameScene {
       for (const v of this.world.vents)
         if (Math.abs(v.x - this.cam.x - 240) < 300) this.particles.spawnBubble(v.x, v.y - 6, -30);
     }
+    if (this.player.hp < this._lastHp && !this.player.dead) sfx.hurt();
+    this._lastHp = this.player.hp;
   }
 
   draw(ctx) {
@@ -283,6 +297,7 @@ export class GameScene {
     if (this.bossActive && this.boss && !this.boss.dead)
       drawBossBar(ctx, 'ABYSSAL ANGLER', this.boss.hp / BOSS.HP);
     this.menu.draw(ctx, player);
+    drawSticks(ctx, this.input);
     if (this.deathTimer > 0) {
       ctx.fillStyle = `rgba(2,3,8,${Math.min(1, (1.2 - this.deathTimer) * 2)})`;
       ctx.fillRect(0, 0, VIEW_W, VIEW_H);
