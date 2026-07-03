@@ -8,6 +8,7 @@ import { Input } from './input.js';
 import { bakeSprites } from './sprites.js';
 import { Camera, drawBackground, drawTiles, drawDecor } from './render.js';
 import { Harpoons } from './harpoon.js';
+import { drawHud, drawBossBar, UpgradeMenu } from './hud.js';
 
 export class GameScene {
   constructor(canvas) {
@@ -23,6 +24,8 @@ export class GameScene {
     this.bubbleTimer = 0;
     this.harpoons = new Harpoons();
     this.pickups = [];
+    this.menu = new UpgradeMenu();
+    this.atBase = false;
   }
 
   update(dt) {
@@ -31,7 +34,26 @@ export class GameScene {
       this.player.x + this.player.w / 2 - this.cam.x,
       this.player.y + this.player.h / 2 - this.cam.y);
     this.input.update();
+    if (this.menu.open) {
+      if (this.input.consumeClick())
+        this.menu.click(this.input.pointer.x, this.input.pointer.y, this.player);
+      return; // pause world while menu open
+    }
     this.player.update(dt, this.input, this.world);
+
+    const pcx = this.player.x + this.player.w / 2, pcy = this.player.y + this.player.h / 2;
+    const near = (pt, r) => Math.abs(pt.x - pcx) < r && Math.abs(pt.y - pcy) < r;
+    for (const v of this.world.vents)
+      if (near(v, 20)) this.player.addO2(P.O2_VENT_REFILL, dt);
+    for (const k of this.world.checkpoints)
+      if (near(k, 16)) this.player.setCheckpoint(k.x, k.y);
+    const wasAtBase = this.atBase;
+    this.atBase = near(this.world.base, 24);
+    if (this.atBase && !wasAtBase) {
+      this.player.bank();
+      this.player.setCheckpoint(this.world.base.x, this.world.base.y);
+      this.menu.open = true;
+    }
 
     if (this.input.firing) {
       const px = this.player.x + this.player.w / 2, py = this.player.y + this.player.h / 2;
@@ -91,6 +113,12 @@ export class GameScene {
     drawBackground(ctx, cam, world);
     drawDecor(ctx, cam, world, this.time);
     drawTiles(ctx, cam, world, S);
+    // base submarine marker
+    const b = world.base;
+    ctx.fillStyle = '#3a5468';
+    ctx.fillRect(Math.round(b.x - 14 - cam.x), Math.round(b.y - 6 - cam.y), 28, 12);
+    ctx.fillStyle = '#78dceb';
+    ctx.fillRect(Math.round(b.x + 6 - cam.x), Math.round(b.y - 3 - cam.y), 4, 4);
     const spr = player.facing >= 0 ? S.diverR : S.diverL;
     const bob = Math.sin(this.time * 3) * 1;
     if (!(player.invuln > 0 && Math.floor(this.time * 12) % 2)) {
@@ -124,10 +152,13 @@ export class GameScene {
     }
     for (const n of world.nodes)
       if (n.hp > 0 && Math.abs(n.x - px) < 260) L.addPoint(n.x, n.y, 18, '#5ae0e6', 0.4);
+    L.addPoint(b.x, b.y, 44, '#9fd0e0', 0.5);
     L.apply(ctx);
 
     // emissive glows on top
     glow(ctx, cam, px + this.input.aim.x * 8, py + this.input.aim.y * 8, 6, '#fff4d0', 0.5);
     this.particles.draw(ctx, cam);
+    drawHud(ctx, player);
+    this.menu.draw(ctx, player);
   }
 }
