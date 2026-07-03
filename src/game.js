@@ -1,4 +1,4 @@
-import { VIEW_W, VIEW_H, LIGHT, PLAYER as P } from './constants.js';
+import { VIEW_W, VIEW_H, LIGHT, PLAYER as P, CRYSTALS_PER_NODE } from './constants.js';
 import { Lighting, glow } from './lighting.js';
 import { Particles } from './particles.js';
 import { MAP_ROWS } from './map.js';
@@ -7,6 +7,7 @@ import { Player } from './player.js';
 import { Input } from './input.js';
 import { bakeSprites } from './sprites.js';
 import { Camera, drawBackground, drawTiles, drawDecor } from './render.js';
+import { Harpoons } from './harpoon.js';
 
 export class GameScene {
   constructor(canvas) {
@@ -20,6 +21,8 @@ export class GameScene {
     this.lighting = new Lighting();
     this.particles = new Particles();
     this.bubbleTimer = 0;
+    this.harpoons = new Harpoons();
+    this.pickups = [];
   }
 
   update(dt) {
@@ -29,6 +32,48 @@ export class GameScene {
       this.player.y + this.player.h / 2 - this.cam.y);
     this.input.update();
     this.player.update(dt, this.input, this.world);
+
+    if (this.input.firing) {
+      const px = this.player.x + this.player.w / 2, py = this.player.y + this.player.h / 2;
+      if (this.harpoons.tryFire(px + this.input.aim.x * 12, py + this.input.aim.y * 12,
+          this.input.aim, P.HARPOON_SPD, this.player.dmgValue(), this.player))
+        this.particles.spawnBubble(px, py);
+    }
+    this.harpoons.update(dt, this.world);
+
+    // crystal nodes
+    for (const n of this.world.nodes) {
+      if (n.hp <= 0) continue;
+      const hit = this.harpoons.hitTest({ x: n.x - 8, y: n.y - 6, w: 16, h: 12 });
+      if (hit) {
+        hit.dead = true;
+        n.hp -= 1;
+        this.particles.spawnSpark(n.x, n.y, '#5ae0e6');
+        if (n.hp <= 0) {
+          for (let i = 0; i < CRYSTALS_PER_NODE; i++) {
+            const a = Math.random() * Math.PI * 2;
+            this.pickups.push({ kind: 'crystal', x: n.x, y: n.y,
+              vx: Math.cos(a) * 40, vy: Math.sin(a) * 40 - 15, t: 0 });
+          }
+        }
+      }
+    }
+
+    // pickups drift & collect
+    const pr = this.player;
+    this.pickups = this.pickups.filter(pk => {
+      pk.t += dt;
+      pk.vx *= 0.95; pk.vy *= 0.95;
+      pk.x += pk.vx * dt; pk.y += pk.vy * dt + Math.sin(pk.t * 3) * 0.15;
+      if (!pr.dead && Math.abs(pk.x - pr.x - pr.w / 2) < 12 && Math.abs(pk.y - pr.y - pr.h / 2) < 10) {
+        if (pk.kind === 'crystal') pr.pickupCrystal(1);
+        else pr.hasRelic = true;
+        this.particles.spawnSpark(pk.x, pk.y, '#b8f8fa');
+        return false;
+      }
+      return true;
+    });
+
     this.cam.update(dt, this.player.x + this.player.w / 2,
                     this.player.y + this.player.h / 2, this.world);
     this.particles.update(dt, this.world, this.cam);
@@ -54,6 +99,14 @@ export class GameScene {
         Math.round(player.y - cam.y - 1 + bob));
     }
 
+    for (const n of world.nodes)
+      if (n.hp > 0)
+        ctx.drawImage(S.node, Math.round(n.x - 8 - cam.x), Math.round(n.y - 5 - cam.y));
+    for (const pk of this.pickups)
+      ctx.drawImage(pk.kind === 'crystal' ? S.crystal : S.relic,
+        Math.round(pk.x - 3 - cam.x), Math.round(pk.y - 4 - cam.y));
+    this.harpoons.draw(ctx, cam);
+
     // lighting
     const L = this.lighting;
     L.begin(cam, world);
@@ -69,6 +122,8 @@ export class GameScene {
         decorLights++;
       }
     }
+    for (const n of world.nodes)
+      if (n.hp > 0 && Math.abs(n.x - px) < 260) L.addPoint(n.x, n.y, 18, '#5ae0e6', 0.4);
     L.apply(ctx);
 
     // emissive glows on top
