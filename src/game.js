@@ -1,4 +1,5 @@
-import { VIEW_W, VIEW_H, LIGHT, PLAYER as P, CRYSTALS_PER_NODE } from './constants.js';
+import { VIEW_W, VIEW_H, LIGHT, PLAYER as P, CRYSTALS_PER_NODE, ENEMY } from './constants.js';
+import { Jellyfish, Moray, Fish } from './enemies.js';
 import { Lighting, glow } from './lighting.js';
 import { Particles } from './particles.js';
 import { MAP_ROWS } from './map.js';
@@ -23,6 +24,13 @@ export class GameScene {
     this.particles = new Particles();
     this.bubbleTimer = 0;
     this.harpoons = new Harpoons();
+    this.enemies = [
+      ...this.world.jelly.map(j => new Jellyfish(j.x, j.y)),
+      ...this.world.holes.map(h => new Moray(h.x, h.y, h.dir)),
+    ];
+    for (const f of this.world.fishSpawns)
+      for (let i = 0; i < ENEMY.FISH.PER_SCHOOL; i++)
+        this.enemies.push(new Fish(f.x + (Math.random() - 0.5) * 30, f.y + (Math.random() - 0.5) * 20));
     this.pickups = [];
     this.menu = new UpgradeMenu();
     this.atBase = false;
@@ -62,6 +70,22 @@ export class GameScene {
         this.particles.spawnBubble(px, py);
     }
     this.harpoons.update(dt, this.world);
+
+    const lampCone = {
+      x: pcx, y: pcy,
+      angle: Math.atan2(this.input.aim.y, this.input.aim.x),
+      spread: LIGHT.LAMP_SPREAD, reach: LIGHT.LAMP_REACH,
+    };
+    for (const e of this.enemies) {
+      e.update(dt, this.world, this.player, lampCone);
+      const hit = this.harpoons.hitTest(e.rect());
+      if (hit) {
+        hit.dead = true;
+        e.takeDamage(hit.dmg);
+        this.particles.spawnSpark(e.x + e.w / 2, e.y + e.h / 2, '#ffb0a0');
+      }
+    }
+    this.enemies = this.enemies.filter(e => !e.dead);
 
     // crystal nodes
     for (const n of this.world.nodes) {
@@ -135,6 +159,25 @@ export class GameScene {
         Math.round(pk.x - 3 - cam.x), Math.round(pk.y - 4 - cam.y));
     this.harpoons.draw(ctx, cam);
 
+    for (const e of this.enemies) {
+      const ex = Math.round(e.x - cam.x), ey = Math.round(e.y - cam.y);
+      if (e instanceof Jellyfish) ctx.drawImage(S.jelly, ex, ey);
+      else if (e instanceof Moray) {
+        if (e.state !== 'hidden') {
+          if (e.dir.x < 0) {
+            ctx.save(); ctx.translate(ex + 26, ey); ctx.scale(-1, 1);
+            ctx.drawImage(S.moray, 0, 0); ctx.restore();
+          } else ctx.drawImage(S.moray, ex, ey);
+        }
+      } else {
+        if (e.vx < 0) {
+          ctx.save(); ctx.translate(ex + 8, ey); ctx.scale(-1, 1);
+          ctx.drawImage(S.fish, 0, 0); ctx.restore();
+        } else ctx.drawImage(S.fish, ex, ey);
+        if (e.aggro) { ctx.fillStyle = '#ff5050'; ctx.fillRect(ex + (e.vx < 0 ? 5 : 2), ey + 1, 1, 1); }
+      }
+    }
+
     // lighting
     const L = this.lighting;
     L.begin(cam, world);
@@ -150,6 +193,9 @@ export class GameScene {
         decorLights++;
       }
     }
+    for (const e of this.enemies)
+      if (e instanceof Jellyfish && Math.abs(e.x - px) < 260)
+        L.addPoint(e.x + 7, e.y + 5, 26, '#be8cff', 0.4);
     for (const n of world.nodes)
       if (n.hp > 0 && Math.abs(n.x - px) < 260) L.addPoint(n.x, n.y, 18, '#5ae0e6', 0.4);
     L.addPoint(b.x, b.y, 44, '#9fd0e0', 0.5);
