@@ -63,12 +63,14 @@ export class GameScene {
           this.bossActive = false;
           this.boss.hp = BOSS.HP;
           this.boss.state = 'idle';
+          this.boss.timer = BOSS.IDLE_TIME;
+          this.boss.vx = this.boss.vy = 0;
         }
       }
       return;
     }
     const evts = this.player.update(dt, this.input, this.world);
-    if (evts.includes('died')) this.deathTimer = 1.2;
+    if (evts.includes('died')) { this.deathTimer = 1.2; return; }
 
     const pcx = this.player.x + this.player.w / 2, pcy = this.player.y + this.player.h / 2;
     const near = (pt, r) => Math.abs(pt.x - pcx) < r && Math.abs(pt.y - pcy) < r;
@@ -81,8 +83,8 @@ export class GameScene {
     if (this.atBase && !wasAtBase) {
       this.player.bank();
       this.player.setCheckpoint(this.world.base.x, this.world.base.y);
+      if (this.player.hasRelic && this.onClear) { this.onClear(); return; }
       this.menu.open = true;
-      if (this.player.hasRelic && this.onClear) this.onClear();
     }
 
     if (this.input.firing) {
