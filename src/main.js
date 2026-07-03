@@ -14,7 +14,7 @@ window.addEventListener('resize', resize);
 resize();
 
 let scene = {
-  update() {},
+  update(dt) {},
   draw(c) { c.fillStyle = '#04050e'; c.fillRect(0, 0, VIEW_W, VIEW_H); },
 };
 export function setScene(s) { scene = s; }
