@@ -1,9 +1,10 @@
-import { VIEW_W, VIEW_H, LIGHT, PLAYER as P, CRYSTALS_PER_NODE, ENEMY } from './constants.js';
+import { VIEW_W, VIEW_H, LIGHT, PLAYER as P, CRYSTALS_PER_NODE, ENEMY, BOSS } from './constants.js';
 import { Jellyfish, Moray, Fish } from './enemies.js';
+import { Angler } from './boss.js';
 import { Lighting, glow } from './lighting.js';
 import { Particles } from './particles.js';
 import { MAP_ROWS } from './map.js';
-import { parseMap } from './world.js';
+import { parseMap, setGate } from './world.js';
 import { Player } from './player.js';
 import { Input } from './input.js';
 import { bakeSprites } from './sprites.js';
@@ -34,6 +35,9 @@ export class GameScene {
     this.pickups = [];
     this.menu = new UpgradeMenu();
     this.atBase = false;
+    this.boss = this.world.angler ? new Angler(this.world.angler.x, this.world.angler.y) : null;
+    this.bossActive = false;
+    this.relicDropped = false;
   }
 
   update(dt) {
@@ -86,6 +90,34 @@ export class GameScene {
       }
     }
     this.enemies = this.enemies.filter(e => !e.dead);
+
+    if (this.boss && !this.boss.dead) {
+      const arena = { x: this.boss.x - 170, y: this.boss.y - 100, w: 440, h: 270 };
+      if (!this.bossActive &&
+          pcx > arena.x && pcx < arena.x + arena.w &&
+          pcy > arena.y && pcy < arena.y + arena.h) {
+        this.bossActive = true;
+        setGate(this.world, true);
+      }
+      if (this.bossActive) {
+        this.boss.update(dt, this.world, this.player,
+          (x, y) => { const f = new Fish(x, y); f.aggro = true; f.calm = 99; this.enemies.push(f); });
+        const hit = this.harpoons.hitTest(this.boss.rect());
+        if (hit) {
+          hit.dead = true;
+          this.boss.takeDamage(hit.dmg);
+          this.particles.spawnSpark(hit.x, hit.y, '#ffd0a0', 10);
+        }
+        if (this.boss.dead) {
+          setGate(this.world, false);
+          this.bossActive = false;
+          if (!this.relicDropped) {
+            this.relicDropped = true;
+            this.pickups.push({ kind: 'relic', x: this.boss.x + this.boss.w / 2, y: this.boss.y + this.boss.h / 2, vx: 0, vy: -10, t: 0 });
+          }
+        }
+      }
+    }
 
     // crystal nodes
     for (const n of this.world.nodes) {
@@ -178,13 +210,28 @@ export class GameScene {
       }
     }
 
+    if (this.boss && !this.boss.dead) {
+      const bs = S.angler.canvas;
+      const bx = Math.round(this.boss.x - 10 - cam.x), by = Math.round(this.boss.y - 13 - cam.y);
+      if (this.boss.facing === 1) {
+        ctx.save(); ctx.translate(bx + bs.width, by); ctx.scale(-1, 1);
+        ctx.drawImage(bs, 0, 0); ctx.restore();
+      } else ctx.drawImage(bs, bx, by);
+    }
+
     // lighting
     const L = this.lighting;
-    L.begin(cam, world);
+    const dark = this.bossActive && this.boss && this.boss.phase2();
+    L.begin(cam, world, dark);
     const px = player.x + player.w / 2, py = player.y + player.h / 2;
     const ang = Math.atan2(this.input.aim.y, this.input.aim.x);
     L.addCone(px, py, ang, LIGHT.LAMP_SPREAD, LIGHT.LAMP_REACH);
     L.addPoint(px, py, 30, '#ffeec2', 0.6);
+    if (this.boss && !this.boss.dead && this.bossActive) {
+      const lu = this.boss.lure();
+      const flick = this.boss.flash ? 0.4 : 1;
+      L.addPoint(lu.x, lu.y, 90, '#d8ffa0', 0.9 * flick);
+    }
     let decorLights = 0;
     for (const d of world.decor) {
       if (decorLights >= 6) break;
@@ -203,8 +250,14 @@ export class GameScene {
 
     // emissive glows on top
     glow(ctx, cam, px + this.input.aim.x * 8, py + this.input.aim.y * 8, 6, '#fff4d0', 0.5);
+    if (this.boss && !this.boss.dead && this.bossActive) {
+      const lu = this.boss.lure();
+      glow(ctx, cam, lu.x, lu.y, 8, '#f0ffd0', this.boss.flash ? 0.4 : 0.9);
+    }
     this.particles.draw(ctx, cam);
     drawHud(ctx, player);
+    if (this.bossActive && this.boss && !this.boss.dead)
+      drawBossBar(ctx, 'ABYSSAL ANGLER', this.boss.hp / BOSS.HP);
     this.menu.draw(ctx, player);
   }
 }
