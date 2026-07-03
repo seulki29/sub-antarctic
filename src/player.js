@@ -72,8 +72,8 @@ export class Player {
     if (this.invuln > 0 || this.dead) return false;
     this.hp -= n;
     this.invuln = P.INVULN;
-    this.vx = Math.sign(this.x - fromX || 1) * 140;
-    this.vy = -40;
+    this.vx = Math.sign(this.x - fromX || 1) * P.KNOCKBACK_VX;
+    this.vy = P.KNOCKBACK_VY;
     return true;
   }
 
@@ -110,7 +110,8 @@ export class Player {
     this.vx = this.vy = 0;
     this.hp = P.HP_MAX;
     this.o2 = this.o2Max();
-    this.invuln = 2;
+    this.invuln = P.RESPAWN_INVULN;
+    this.slow = this.boostT = this.boostCd = this.fireCd = 0;
     this._o2HpTimer = 0;
   }
 }
