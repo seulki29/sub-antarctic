@@ -10,7 +10,7 @@ import { Input } from './input.js';
 import { bakeSprites } from './sprites.js';
 import { Camera, drawBackground, drawTiles, drawDecor } from './render.js';
 import { Harpoons } from './harpoon.js';
-import { drawHud, drawBossBar, UpgradeMenu } from './hud.js';
+import { drawHud, drawBossBar, UpgradeMenu, drawText, textWidth } from './hud.js';
 
 export class GameScene {
   constructor(canvas) {
@@ -38,6 +38,8 @@ export class GameScene {
     this.boss = this.world.angler ? new Angler(this.world.angler.x, this.world.angler.y) : null;
     this.bossActive = false;
     this.relicDropped = false;
+    this.deathTimer = 0;
+    this.onClear = null;
   }
 
   update(dt) {
@@ -51,7 +53,22 @@ export class GameScene {
         this.menu.click(this.input.pointer.x, this.input.pointer.y, this.player);
       return; // pause world while menu open
     }
-    this.player.update(dt, this.input, this.world);
+    if (this.deathTimer > 0) {
+      this.deathTimer -= dt;
+      if (this.deathTimer <= 0) {
+        this.player.respawn();
+        if (this.bossActive && this.boss && !this.boss.dead) {
+          // reset boss fight
+          setGate(this.world, false);
+          this.bossActive = false;
+          this.boss.hp = BOSS.HP;
+          this.boss.state = 'idle';
+        }
+      }
+      return;
+    }
+    const evts = this.player.update(dt, this.input, this.world);
+    if (evts.includes('died')) this.deathTimer = 1.2;
 
     const pcx = this.player.x + this.player.w / 2, pcy = this.player.y + this.player.h / 2;
     const near = (pt, r) => Math.abs(pt.x - pcx) < r && Math.abs(pt.y - pcy) < r;
@@ -65,6 +82,7 @@ export class GameScene {
       this.player.bank();
       this.player.setCheckpoint(this.world.base.x, this.world.base.y);
       this.menu.open = true;
+      if (this.player.hasRelic && this.onClear) this.onClear();
     }
 
     if (this.input.firing) {
@@ -263,5 +281,10 @@ export class GameScene {
     if (this.bossActive && this.boss && !this.boss.dead)
       drawBossBar(ctx, 'ABYSSAL ANGLER', this.boss.hp / BOSS.HP);
     this.menu.draw(ctx, player);
+    if (this.deathTimer > 0) {
+      ctx.fillStyle = `rgba(2,3,8,${Math.min(1, (1.2 - this.deathTimer) * 2)})`;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      drawText(ctx, 'YOU DIED', (VIEW_W - textWidth('YOU DIED', 2)) / 2, 128, '#c04050', 2);
+    }
   }
 }
