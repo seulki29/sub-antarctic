@@ -1,4 +1,5 @@
 import { VIEW_W, VIEW_H, DT } from './constants.js';
+import { GameScene } from './game.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -29,3 +30,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+setScene(new GameScene(canvas));
