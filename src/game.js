@@ -92,7 +92,11 @@ export class GameScene {
     this.enemies = this.enemies.filter(e => !e.dead);
 
     if (this.boss && !this.boss.dead) {
-      const arena = { x: this.boss.x - 170, y: this.boss.y - 100, w: 440, h: 270 };
+      const arena = {
+        x: this.boss.x + this.boss.w / 2 - 170,
+        y: this.boss.y + this.boss.h / 2 - 100,
+        w: 440, h: 270,
+      };
       if (!this.bossActive &&
           pcx > arena.x && pcx < arena.x + arena.w &&
           pcy > arena.y && pcy < arena.y + arena.h) {
