@@ -1,4 +1,6 @@
-import { VIEW_W, VIEW_H } from './constants.js';
+import { VIEW_W, VIEW_H, LIGHT, PLAYER as P } from './constants.js';
+import { Lighting, glow } from './lighting.js';
+import { Particles } from './particles.js';
 import { MAP_ROWS } from './map.js';
 import { parseMap } from './world.js';
 import { Player } from './player.js';
@@ -15,6 +17,9 @@ export class GameScene {
     this.input.attach(canvas);
     this.cam = new Camera();
     this.time = 0;
+    this.lighting = new Lighting();
+    this.particles = new Particles();
+    this.bubbleTimer = 0;
   }
 
   update(dt) {
@@ -26,6 +31,14 @@ export class GameScene {
     this.player.update(dt, this.input, this.world);
     this.cam.update(dt, this.player.x + this.player.w / 2,
                     this.player.y + this.player.h / 2, this.world);
+    this.particles.update(dt, this.world, this.cam);
+    this.bubbleTimer -= dt;
+    if (this.bubbleTimer <= 0) {
+      this.bubbleTimer = 0.9 + Math.random() * 0.6;
+      this.particles.spawnBubble(this.player.x + (this.player.facing > 0 ? 2 : this.player.w - 2), this.player.y);
+      for (const v of this.world.vents)
+        if (Math.abs(v.x - this.cam.x - 240) < 300) this.particles.spawnBubble(v.x, v.y - 6, -30);
+    }
   }
 
   draw(ctx) {
@@ -40,5 +53,26 @@ export class GameScene {
         Math.round(player.x - cam.x - 4),
         Math.round(player.y - cam.y - 1 + bob));
     }
+
+    // lighting
+    const L = this.lighting;
+    L.begin(cam, world);
+    const px = player.x + player.w / 2, py = player.y + player.h / 2;
+    const ang = Math.atan2(this.input.aim.y, this.input.aim.x);
+    L.addCone(px, py, ang, LIGHT.LAMP_SPREAD, LIGHT.LAMP_REACH);
+    L.addPoint(px, py, 30, '#ffeec2', 0.6);
+    let decorLights = 0;
+    for (const d of world.decor) {
+      if (decorLights >= 6) break;
+      if (Math.abs(d.x - px) < 260 && Math.abs(d.y - py) < 160) {
+        L.addPoint(d.x, d.y - 3, 22, d.color, 0.35);
+        decorLights++;
+      }
+    }
+    L.apply(ctx);
+
+    // emissive glows on top
+    glow(ctx, cam, px + this.input.aim.x * 8, py + this.input.aim.y * 8, 6, '#fff4d0', 0.5);
+    this.particles.draw(ctx, cam);
   }
 }
