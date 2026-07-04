@@ -12,14 +12,17 @@ import { Camera, drawBackground, drawTiles, drawDecor } from './render.js';
 import { Harpoons } from './harpoon.js';
 import { drawHud, drawBossBar, UpgradeMenu, drawText, textWidth, drawSticks } from './hud.js';
 import { sfx, setBgmMode } from './audio.js';
+import { buildSave, applySave, storeSave } from './save.js';
 
 export class GameScene {
-  constructor(canvas, diffKey = 'normal') {
+  constructor(canvas, diffKey = 'normal', save = null) {
     this.world = parseMap(MAP_ROWS);
+    this.diffKey = diffKey;
     this.diff = DIFFICULTY[diffKey] || DIFFICULTY.normal;
     applyDifficulty(this.world, this.diff);
     this.S = bakeSprites();
     this.player = new Player(this.world.base.x, this.world.base.y, this.diff.hp);
+    this._resume = save ? applySave(save, this.world, this.player) : null;
     this.input = new Input();
     this.input.attach(canvas);
     this.cam = new Camera();
@@ -50,7 +53,17 @@ export class GameScene {
     this.relicDropped = false;
     this.deathTimer = 0;
     this.onClear = null;
+    this.cleared = false;
     this._lastHp = this.player.hp;
+    if (this._resume) {
+      this.cleared = this._resume.cleared;
+      if (this._resume.bossDead && this.boss) {
+        this.boss.dead = true;
+        this.relicDropped = true;
+        if (!this._resume.cleared)
+          this.pickups.push({ kind: 'relic', x: this.world.angler.x, y: this.world.angler.y, vx: 0, vy: 0, t: 0 });
+      }
+    }
   }
 
   update(dt) {
@@ -62,7 +75,7 @@ export class GameScene {
     if (this.menu.open) {
       if (this.input.consumeClick()) {
         const r = this.menu.click(this.input.pointer.x, this.input.pointer.y, this.player);
-        if (r === 'bought') sfx.buy(); else if (r === null) sfx.denied();
+        if (r === 'bought') { sfx.buy(); storeSave(this._snapshot()); } else if (r === null) sfx.denied();
       }
       return; // pause world while menu open
     }
@@ -102,7 +115,13 @@ export class GameScene {
       this.player.bank();
       sfx.bank();
       this.player.setCheckpoint(this.world.base.x, this.world.base.y);
-      if (this.player.hasRelic && this.onClear) { this.onClear(); return; }
+      if (this.player.hasRelic && this.onClear) {
+        this.cleared = true;
+        storeSave(this._snapshot());
+        this.onClear();
+        return;
+      }
+      storeSave(this._snapshot());
       this.menu.open = true;
     }
 
@@ -211,6 +230,11 @@ export class GameScene {
     }
     if (this.player.hp < this._lastHp && !this.player.dead) sfx.hurt();
     this._lastHp = this.player.hp;
+  }
+
+  _snapshot() {
+    return buildSave(this.diffKey, this.player, this.world,
+      this.boss ? this.boss.dead : false, this.cleared);
   }
 
   draw(ctx) {
