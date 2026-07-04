@@ -1,7 +1,7 @@
-import { VIEW_W, VIEW_H, DT, fitViewWidth } from './constants.js';
+import { VIEW_W, VIEW_H, DT, fitViewWidth, DIFFICULTY } from './constants.js';
 import { GameScene } from './game.js';
 import { drawText, textWidth } from './hud.js';
-import { initAudio } from './audio.js';
+import { initAudio, setMuted, isMuted, startBgm } from './audio.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -36,18 +36,26 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
+function viewPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const p = e.touches ? e.touches[0] : e;
+  return { x: (p.clientX - r.left) / r.width * VIEW_W, y: (p.clientY - r.top) / r.height * VIEW_H };
+}
+
 function makeTitle() {
   let pulse = 0;
-  const start = () => {
+  const snd = () => ({ x: 8, y: VIEW_H - 20, w: textWidth('SOUND OFF') + 8, h: 14 });
+  const onTap = e => {
+    if (e.touches) e.preventDefault();
     initAudio();
-    const g = new GameScene(canvas);
-    const t0 = performance.now();
-    g.onClear = () => setScene(makeClear(g, (performance.now() - t0) / 1000));
-    setScene(g);
+    const p = viewPos(e), r = snd();
+    if (p.x < r.x + r.w && p.y > r.y - 4) { setMuted(!isMuted()); return; }
+    canvas.removeEventListener('mousedown', onTap);
+    canvas.removeEventListener('touchstart', onTap);
+    setScene(makeDifficulty());
   };
-  const onTap = () => { canvas.removeEventListener('mousedown', onTap); canvas.removeEventListener('touchstart', onTap); start(); };
   canvas.addEventListener('mousedown', onTap);
-  canvas.addEventListener('touchstart', onTap);
+  canvas.addEventListener('touchstart', onTap, { passive: false });
   return {
     update(dt) { pulse += dt; },
     draw(c) {
@@ -57,6 +65,53 @@ function makeTitle() {
       drawText(c, 'SUB-ANTARCTIC', (VIEW_W - textWidth('SUB-ANTARCTIC', 3)) / 2, 90, '#9fd0e0', 3);
       if (Math.floor(pulse * 2) % 2)
         drawText(c, 'CLICK OR TAP TO DIVE', (VIEW_W - textWidth('CLICK OR TAP TO DIVE')) / 2, 150, '#5a8ca0');
+      drawText(c, `SOUND ${isMuted() ? 'OFF' : 'ON'}`, 8, VIEW_H - 18, '#5a8ca0');
+    },
+  };
+}
+
+function makeDifficulty() {
+  const rows = [
+    { key: 'easy',   label: 'EASY' },
+    { key: 'normal', label: 'NORMAL' },
+    { key: 'hard',   label: 'HARD' },
+  ];
+  const btn = i => ({ x: (VIEW_W - 220) / 2, y: 92 + i * 40, w: 220, h: 30 });
+  const start = key => {
+    initAudio();
+    startBgm();
+    const g = new GameScene(canvas, key);
+    const t0 = performance.now();
+    g.onClear = () => setScene(makeClear(g, (performance.now() - t0) / 1000));
+    setScene(g);
+  };
+  const onTap = e => {
+    if (e.touches) e.preventDefault();
+    const p = viewPos(e);
+    for (let i = 0; i < rows.length; i++) {
+      const b = btn(i);
+      if (p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h) {
+        canvas.removeEventListener('mousedown', onTap);
+        canvas.removeEventListener('touchstart', onTap);
+        start(rows[i].key);
+        return;
+      }
+    }
+  };
+  canvas.addEventListener('mousedown', onTap);
+  canvas.addEventListener('touchstart', onTap, { passive: false });
+  return {
+    update(dt) {},
+    draw(c) {
+      c.fillStyle = '#04050e'; c.fillRect(0, 0, VIEW_W, VIEW_H);
+      drawText(c, 'SELECT DEPTH RATING', (VIEW_W - textWidth('SELECT DEPTH RATING', 2)) / 2, 52, '#9fd0e0', 2);
+      rows.forEach((r, i) => {
+        const b = btn(i), d = DIFFICULTY[r.key];
+        c.fillStyle = ['#2a5a3a', '#2a5a78', '#5a2a34'][i];
+        c.fillRect(b.x, b.y, b.w, b.h);
+        drawText(c, r.label, b.x + 10, b.y + 6, '#e0f0f4', 2);
+        drawText(c, `${d.hp} HEARTS ${d.nodes} ORE ${d.vents} AIR`, b.x + 10, b.y + 20, '#a0c8d8');
+      });
     },
   };
 }

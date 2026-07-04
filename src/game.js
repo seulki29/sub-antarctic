@@ -11,7 +11,7 @@ import { bakeSprites } from './sprites.js';
 import { Camera, drawBackground, drawTiles, drawDecor } from './render.js';
 import { Harpoons } from './harpoon.js';
 import { drawHud, drawBossBar, UpgradeMenu, drawText, textWidth, drawSticks } from './hud.js';
-import { sfx } from './audio.js';
+import { sfx, setBgmMode } from './audio.js';
 
 export class GameScene {
   constructor(canvas, diffKey = 'normal') {
@@ -79,6 +79,7 @@ export class GameScene {
           this.boss.state = 'idle';
           this.boss.timer = BOSS.IDLE_TIME;
           this.boss.vx = this.boss.vy = 0;
+          setBgmMode('calm');
           // return boss to its lair so the retry starts like the first attempt
           this.boss.x = this.world.angler.x - this.boss.w / 2;
           this.boss.y = this.world.angler.y - this.boss.h / 2;
@@ -139,6 +140,7 @@ export class GameScene {
           pcy > arena.y && pcy < arena.y + arena.h) {
         this.bossActive = true;
         setGate(this.world, true);
+        setBgmMode('boss');
       }
       if (this.bossActive) {
         this.boss.update(dt, this.world, this.player,
@@ -152,6 +154,7 @@ export class GameScene {
         }
         if (this.boss.dead) {
           sfx.boom();
+          setBgmMode('calm');
           setGate(this.world, false);
           this.bossActive = false;
           if (!this.relicDropped) {
