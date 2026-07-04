@@ -39,7 +39,7 @@ export function drawHud(ctx, player) {
   ctx.fillRect(7, 7, Math.round(60 * frac), 5);
   drawText(ctx, 'O2', 72, 7, '#8cc8dc');
   // hearts
-  for (let i = 0; i < P.HP_MAX; i++) {
+  for (let i = 0; i < player.hpMax; i++) {
     ctx.fillStyle = i < player.hp ? '#e64656' : '#2a1e2c';
     const x = 6 + i * 9;
     ctx.fillRect(x, 17, 3, 3); ctx.fillRect(x + 4, 17, 3, 3);
@@ -70,16 +70,16 @@ export class UpgradeMenu {
 
   layout(player) {
     const keys = Object.keys(UPGRADES);
-    const bw = 190, bh = 26, x = (VIEW_W - bw) / 2;
+    const bw = 190, bh = 24, x = (VIEW_W - bw) / 2;
     const btns = keys.map((key, i) => {
       const u = UPGRADES[key];
       return {
-        key, x, y: 70 + i * (bh + 8), w: bw, h: bh,
+        key, x, y: 60 + i * (bh + 6), w: bw, h: bh,
         label: u.label, cost: u.cost,
         owned: player.upgrades[key], affordable: player.banked >= u.cost,
       };
     });
-    btns.push({ key: 'close', x, y: 70 + keys.length * (bh + 8), w: bw, h: 20, label: 'CLOSE' });
+    btns.push({ key: 'close', x, y: 60 + keys.length * (bh + 6), w: bw, h: 20, label: 'CLOSE' });
     return btns;
   }
 
@@ -97,10 +97,10 @@ export class UpgradeMenu {
   draw(ctx, player) {
     if (!this.open) return;
     ctx.fillStyle = 'rgba(4,6,14,0.85)';
-    ctx.fillRect(100, 40, VIEW_W - 200, 190);
+    ctx.fillRect(100, 28, VIEW_W - 200, 218);
     ctx.strokeStyle = '#4a7890';
-    ctx.strokeRect(100.5, 40.5, VIEW_W - 200, 190);
-    drawText(ctx, 'SUBMARINE - UPGRADES', (VIEW_W - textWidth('SUBMARINE - UPGRADES', 2)) / 2, 48, '#9fd0e0', 2);
+    ctx.strokeRect(100.5, 28.5, VIEW_W - 200, 218);
+    drawText(ctx, 'SUBMARINE - UPGRADES', (VIEW_W - textWidth('SUBMARINE - UPGRADES', 2)) / 2, 36, '#9fd0e0', 2);
     for (const b of this.layout(player)) {
       const col = b.key === 'close' ? '#3a5468' : b.owned ? '#2a4a3a' : b.affordable ? '#2a5a78' : '#28303c';
       ctx.fillStyle = col;
@@ -110,7 +110,7 @@ export class UpgradeMenu {
         : `${b.label} - ${b.cost} CRYSTAL`;
       drawText(ctx, txt, b.x + 8, b.y + (b.h - 5) / 2, b.owned ? '#8ce0a8' : '#d0e8f0');
     }
-    drawText(ctx, `BANKED ${player.banked}`, 108, 214, '#9ff0f4');
+    drawText(ctx, `BANKED ${player.banked}`, 108, 236, '#9ff0f4');
   }
 }
 

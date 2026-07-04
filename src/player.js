@@ -1,16 +1,16 @@
-import { PLAYER as P, UPGRADES } from './constants.js';
+import { PLAYER as P, UPGRADES, LIGHT } from './constants.js';
 import { moveAndCollide } from './world.js';
 
 export class Player {
-  constructor(x, y) {
+  constructor(x, y, hpMax = P.HP_MAX) {
     this.x = x; this.y = y; this.w = P.W; this.h = P.H;
     this.vx = 0; this.vy = 0;
-    this.hp = P.HP_MAX; this.o2 = P.O2_MAX;
+    this.hpMax = hpMax; this.hp = hpMax; this.o2 = P.O2_MAX;
     this.invuln = 0; this.slow = 0;
     this.boostT = 0; this.boostCd = 0; this.fireCd = 0;
     this.facing = 1;
     this.carried = 0; this.banked = 0;
-    this.upgrades = { tank: false, damage: false };
+    this.upgrades = { tank: false, damage: false, lamp: false, fins: false, suit: false };
     this.checkpoint = { x, y };
     this.hasRelic = false;
     this.dead = false;
@@ -19,6 +19,11 @@ export class Player {
 
   o2Max() { return P.O2_MAX * (this.upgrades.tank ? 1.5 : 1); }
   dmgValue() { return P.HARPOON_DMG * (this.upgrades.damage ? 1.5 : 1); }
+  maxSpd() { return P.MAX_SPD * (this.upgrades.fins ? 1.2 : 1); }
+  boostCdMax() { return P.BOOST_CD * (this.upgrades.fins ? 0.6 : 1); }
+  lampReach() { return LIGHT.LAMP_REACH * (this.upgrades.lamp ? 1.4 : 1); }
+  lampSpread() { return LIGHT.LAMP_SPREAD * (this.upgrades.lamp ? 1.15 : 1); }
+  invulnTime() { return this.upgrades.suit ? 2.5 : P.INVULN; }
 
   update(dt, input, world) {
     const events = [];
@@ -30,7 +35,7 @@ export class Player {
     if (input.boost && this.boostCd <= 0 && this.boostT <= 0 &&
         (input.move.x || input.move.y)) {
       this.boostT = P.BOOST_TIME;
-      this.boostCd = P.BOOST_CD;
+      this.boostCd = this.boostCdMax();
       this.o2 = Math.max(0, this.o2 - P.BOOST_O2);
       const len = Math.hypot(input.move.x, input.move.y) || 1;
       this.vx = input.move.x / len * P.BOOST_SPD;
@@ -43,8 +48,9 @@ export class Player {
     if (this.boostT <= 0) {
       this.vx += input.move.x * P.ACCEL * slowMul * dt;
       this.vy += input.move.y * P.ACCEL * slowMul * dt;
+      const ms = this.maxSpd();
       const spd = Math.hypot(this.vx, this.vy);
-      if (spd > P.MAX_SPD) { this.vx *= P.MAX_SPD / spd; this.vy *= P.MAX_SPD / spd; }
+      if (spd > ms) { this.vx *= ms / spd; this.vy *= ms / spd; }
     }
     this.vx -= this.vx * P.DRAG * dt;
     this.vy -= this.vy * P.DRAG * dt;
@@ -71,9 +77,10 @@ export class Player {
   damage(n, fromX = this.x) {
     if (this.invuln > 0 || this.dead) return false;
     this.hp -= n;
-    this.invuln = P.INVULN;
-    this.vx = Math.sign(this.x - fromX || 1) * P.KNOCKBACK_VX;
-    this.vy = P.KNOCKBACK_VY;
+    this.invuln = this.invulnTime();
+    const kb = this.upgrades.suit ? 0.5 : 1;
+    this.vx = Math.sign(this.x - fromX || 1) * P.KNOCKBACK_VX * kb;
+    this.vy = P.KNOCKBACK_VY * kb;
     return true;
   }
 
@@ -84,7 +91,7 @@ export class Player {
     this.banked += amt;
     this.carried = 0;
     this.o2 = this.o2Max();
-    this.hp = P.HP_MAX;
+    this.hp = this.hpMax;
     return amt;
   }
 
@@ -108,7 +115,7 @@ export class Player {
     this.dead = false;
     this.x = this.checkpoint.x; this.y = this.checkpoint.y;
     this.vx = this.vy = 0;
-    this.hp = P.HP_MAX;
+    this.hp = this.hpMax;
     this.o2 = this.o2Max();
     this.invuln = P.RESPAWN_INVULN;
     this.slow = this.boostT = this.boostCd = this.fireCd = 0;

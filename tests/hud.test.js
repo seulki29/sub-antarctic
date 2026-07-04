@@ -29,3 +29,12 @@ test('close button closes menu', () => {
   assert.equal(m.click(close.x + 1, close.y + 1, p), 'closed');
   assert.equal(m.open, false);
 });
+
+test('menu lists all upgrades and stays inside the view', () => {
+  const m = new UpgradeMenu();
+  m.open = true;
+  const p = new Player(0, 0);
+  const btns = m.layout(p);
+  assert.equal(btns.length, Object.keys(UPGRADES).length + 1); // + CLOSE
+  for (const b of btns) assert.ok(b.y + b.h <= 250, `${b.key} fits in view`);
+});
