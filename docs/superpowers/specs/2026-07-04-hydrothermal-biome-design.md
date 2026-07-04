@@ -29,7 +29,7 @@
 
 - `UPGRADES.hull = { cost: 24, label: 'PRESSURE HULL' }` (6번째 업그레이드)
 - 게임: `world.hullOpen = player.upgrades.hull` — 생성 시(세이브 복원 포함)와 구매 직후 갱신
-- 장벽 앞 접근 시(미보유) HUD에 경고 텍스트 1줄 노출: `NEED PRESSURE HULL` (장벽 30px 이내)
+- 장벽 앞 접근 시(미보유) HUD에 경고 텍스트 1줄 노출: `NEED PRESSURE HULL` (장벽 타일 약 3타일 반경 이내)
 - 메뉴 레이아웃 조정: 버튼 6+CLOSE — bh 22·gap 4·시작 y 56 (전부 패널 y28–246 내)
 
 ## 5. 해저드: 증기 분출
