@@ -1,0 +1,14 @@
+{
+  "name": "Sub-Antarctic",
+  "short_name": "Sub-Antarctic",
+  "description": "심해 탐험 액션 — 잠수하고, 채집하고, 살아서 돌아와라",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#04050e",
+  "theme_color": "#04050e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
