@@ -37,6 +37,13 @@ export class GameScene {
     this.menu = new UpgradeMenu();
     this.atBase = false;
     this.boss = this.world.angler ? new Angler(this.world.angler.x, this.world.angler.y) : null;
+    // static arena trigger, anchored to the boss SPAWN point — the live boss
+    // position drifts during the fight and must not drag the trigger with it
+    this.arena = this.world.angler ? {
+      x: this.world.angler.x - 170,
+      y: this.world.angler.y - 100,
+      w: 440, h: 270,
+    } : null;
     this.bossActive = false;
     this.relicDropped = false;
     this.deathTimer = 0;
@@ -70,6 +77,9 @@ export class GameScene {
           this.boss.state = 'idle';
           this.boss.timer = BOSS.IDLE_TIME;
           this.boss.vx = this.boss.vy = 0;
+          // return boss to its lair so the retry starts like the first attempt
+          this.boss.x = this.world.angler.x - this.boss.w / 2;
+          this.boss.y = this.world.angler.y - this.boss.h / 2;
         }
       }
       return;
@@ -121,11 +131,7 @@ export class GameScene {
     this.enemies = this.enemies.filter(e => !e.dead);
 
     if (this.boss && !this.boss.dead) {
-      const arena = {
-        x: this.boss.x + this.boss.w / 2 - 170,
-        y: this.boss.y + this.boss.h / 2 - 100,
-        w: 440, h: 270,
-      };
+      const arena = this.arena;
       if (!this.bossActive &&
           pcx > arena.x && pcx < arena.x + arena.w &&
           pcy > arena.y && pcy < arena.y + arena.h) {
