@@ -100,19 +100,25 @@ function bakeFish() {
   return outline(c);
 }
 
-function bakeCrystal() {
+const GEM_TONES = {
+  crystal: { dark: '#38b8c0', main: '#5ae0e6', hi: '#b8f8fa' },
+  pearl:   { dark: '#c8a8b8', main: '#f0dce6', hi: '#ffffff' },
+  abyss:   { dark: '#c04828', main: '#ff7a50', hi: '#ffd0a0' },
+};
+
+function bakeGem(t) {
   const c = mk(7, 9), g = g2(c);
-  poly(g, [[3, 0], [6, 4], [3, 8], [0, 4]], '#5ae0e6');
-  poly(g, [[3, 0], [6, 4], [3, 4]], '#b8f8fa');
+  poly(g, [[3, 0], [6, 4], [3, 8], [0, 4]], t.main);
+  poly(g, [[3, 0], [6, 4], [3, 4]], t.hi);
   return outline(c);
 }
 
-function bakeNode() {
+function bakeNodeKind(t) {
   const c = mk(16, 12), g = g2(c);
-  poly(g, [[2, 11], [4, 4], [7, 11]], '#38b8c0');
-  poly(g, [[6, 11], [9, 1], [12, 11]], '#5ae0e6');
-  poly(g, [[10, 11], [13, 6], [15, 11]], '#38b8c0');
-  poly(g, [[8, 4], [9, 1], [10, 4]], '#b8f8fa');
+  poly(g, [[2, 11], [4, 4], [7, 11]], t.dark);
+  poly(g, [[6, 11], [9, 1], [12, 11]], t.main);
+  poly(g, [[10, 11], [13, 6], [15, 11]], t.dark);
+  poly(g, [[8, 4], [9, 1], [10, 4]], t.hi);
   return outline(c);
 }
 
@@ -178,7 +184,9 @@ export function bakeSprites() {
   return {
     ...bakeDiver(),
     jelly: bakeJelly(), moray: bakeMoray(), fish: bakeFish(),
-    crystal: bakeCrystal(), node: bakeNode(), relic: bakeRelic(),
+    gems: Object.fromEntries(Object.entries(GEM_TONES).map(([k, t]) => [k, bakeGem(t)])),
+    nodes: Object.fromEntries(Object.entries(GEM_TONES).map(([k, t]) => [k, bakeNodeKind(t)])),
+    relic: bakeRelic(),
     rock: bakeRocks(), angler: bakeAngler(),
   };
 }

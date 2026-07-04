@@ -1,10 +1,10 @@
-import { VIEW_W, VIEW_H, LIGHT, PLAYER as P, CRYSTALS_PER_NODE, ENEMY, BOSS } from './constants.js';
+import { VIEW_W, VIEW_H, PLAYER as P, CRYSTALS_PER_NODE, ENEMY, BOSS, DIFFICULTY, MINERALS } from './constants.js';
 import { Jellyfish, Moray, Fish } from './enemies.js';
 import { Angler } from './boss.js';
 import { Lighting, glow } from './lighting.js';
 import { Particles } from './particles.js';
 import { MAP_ROWS } from './map.js';
-import { parseMap, setGate } from './world.js';
+import { parseMap, setGate, applyDifficulty } from './world.js';
 import { Player } from './player.js';
 import { Input } from './input.js';
 import { bakeSprites } from './sprites.js';
@@ -14,10 +14,12 @@ import { drawHud, drawBossBar, UpgradeMenu, drawText, textWidth, drawSticks } fr
 import { sfx } from './audio.js';
 
 export class GameScene {
-  constructor(canvas) {
+  constructor(canvas, diffKey = 'normal') {
     this.world = parseMap(MAP_ROWS);
+    this.diff = DIFFICULTY[diffKey] || DIFFICULTY.normal;
+    applyDifficulty(this.world, this.diff);
     this.S = bakeSprites();
-    this.player = new Player(this.world.base.x, this.world.base.y);
+    this.player = new Player(this.world.base.x, this.world.base.y, this.diff.hp);
     this.input = new Input();
     this.input.attach(canvas);
     this.cam = new Camera();
@@ -35,7 +37,7 @@ export class GameScene {
         this.enemies.push(new Fish(f.x + (Math.random() - 0.5) * 30, f.y + (Math.random() - 0.5) * 20));
     this.pickups = [];
     this.menu = new UpgradeMenu();
-    this.atBase = false;
+    this.atBase = true; // spawn at base without popping the shop
     this.boss = this.world.angler ? new Angler(this.world.angler.x, this.world.angler.y) : null;
     // static arena trigger, anchored to the boss SPAWN point — the live boss
     // position drifts during the fight and must not drag the trigger with it
@@ -116,7 +118,7 @@ export class GameScene {
     const lampCone = {
       x: pcx, y: pcy,
       angle: Math.atan2(this.input.aim.y, this.input.aim.x),
-      spread: LIGHT.LAMP_SPREAD, reach: LIGHT.LAMP_REACH,
+      spread: this.player.lampSpread(), reach: this.player.lampReach(),
     };
     for (const e of this.enemies) {
       e.update(dt, this.world, this.player, lampCone);
@@ -171,7 +173,7 @@ export class GameScene {
         if (n.hp <= 0) {
           for (let i = 0; i < CRYSTALS_PER_NODE; i++) {
             const a = Math.random() * Math.PI * 2;
-            this.pickups.push({ kind: 'crystal', x: n.x, y: n.y,
+            this.pickups.push({ kind: n.kind, x: n.x, y: n.y,
               vx: Math.cos(a) * 40, vy: Math.sin(a) * 40 - 15, t: 0 });
           }
         }
@@ -185,8 +187,8 @@ export class GameScene {
       pk.vx *= 0.95; pk.vy *= 0.95;
       pk.x += pk.vx * dt; pk.y += pk.vy * dt + Math.sin(pk.t * 3) * 0.15;
       if (!pr.dead && Math.abs(pk.x - pr.x - pr.w / 2) < 12 && Math.abs(pk.y - pr.y - pr.h / 2) < 10) {
-        if (pk.kind === 'crystal') pr.pickupCrystal(1);
-        else pr.hasRelic = true;
+        if (pk.kind === 'relic') pr.hasRelic = true;
+        else pr.pickupCrystal(MINERALS[pk.kind].value);
         this.particles.spawnSpark(pk.x, pk.y, '#b8f8fa');
         sfx.pickup();
         return false;
@@ -229,9 +231,9 @@ export class GameScene {
 
     for (const n of world.nodes)
       if (n.hp > 0)
-        ctx.drawImage(S.node, Math.round(n.x - 8 - cam.x), Math.round(n.y - 5 - cam.y));
+        ctx.drawImage(S.nodes[n.kind], Math.round(n.x - 8 - cam.x), Math.round(n.y - 5 - cam.y));
     for (const pk of this.pickups)
-      ctx.drawImage(pk.kind === 'crystal' ? S.crystal : S.relic,
+      ctx.drawImage(pk.kind === 'relic' ? S.relic : S.gems[pk.kind],
         Math.round(pk.x - 3 - cam.x), Math.round(pk.y - 4 - cam.y));
     this.harpoons.draw(ctx, cam);
 
@@ -269,7 +271,7 @@ export class GameScene {
     L.begin(cam, world, dark);
     const px = player.x + player.w / 2, py = player.y + player.h / 2;
     const ang = Math.atan2(this.input.aim.y, this.input.aim.x);
-    L.addCone(px, py, ang, LIGHT.LAMP_SPREAD, LIGHT.LAMP_REACH);
+    L.addCone(px, py, ang, player.lampSpread(), player.lampReach());
     L.addPoint(px, py, 30, '#ffeec2', 0.6);
     if (this.boss && !this.boss.dead && this.bossActive) {
       const lu = this.boss.lure();
@@ -288,7 +290,7 @@ export class GameScene {
       if (e instanceof Jellyfish && Math.abs(e.x - px) < 260)
         L.addPoint(e.x + 7, e.y + 5, 26, '#be8cff', 0.4);
     for (const n of world.nodes)
-      if (n.hp > 0 && Math.abs(n.x - px) < 260) L.addPoint(n.x, n.y, 18, '#5ae0e6', 0.4);
+      if (n.hp > 0 && Math.abs(n.x - px) < 260) L.addPoint(n.x, n.y, 18, MINERALS[n.kind].color, 0.4);
     L.addPoint(b.x, b.y, 44, '#9fd0e0', 0.5);
     L.apply(ctx);
 
