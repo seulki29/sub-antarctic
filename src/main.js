@@ -1,4 +1,4 @@
-import { VIEW_W, VIEW_H, DT } from './constants.js';
+import { VIEW_W, VIEW_H, DT, fitViewWidth } from './constants.js';
 import { GameScene } from './game.js';
 import { drawText, textWidth } from './hud.js';
 import { initAudio } from './audio.js';
@@ -8,10 +8,13 @@ const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 function resize() {
-  const s = Math.max(1, Math.floor(Math.min(
-    window.innerWidth / VIEW_W, window.innerHeight / VIEW_H)));
+  fitViewWidth(window.innerWidth / window.innerHeight);
+  if (canvas.width !== VIEW_W) canvas.width = VIEW_W;
+  // fractional "contain" scaling — fills the screen; pixelated CSS keeps it crisp
+  const s = Math.min(window.innerWidth / VIEW_W, window.innerHeight / VIEW_H);
   canvas.style.width = VIEW_W * s + 'px';
   canvas.style.height = VIEW_H * s + 'px';
+  ctx.imageSmoothingEnabled = false; // canvas resize resets context state
 }
 window.addEventListener('resize', resize);
 resize();

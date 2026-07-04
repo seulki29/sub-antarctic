@@ -8,6 +8,9 @@ export class Lighting {
   }
 
   begin(cam, world, forcedDark = false) {
+    if (this.c.width !== VIEW_W || this.c.height !== VIEW_H) {
+      this.c.width = VIEW_W; this.c.height = VIEW_H; // follow adaptive view
+    }
     this.cam = cam;
     this.count = 0;
     const g = this.g;

@@ -1,4 +1,11 @@
-export const VIEW_W = 480, VIEW_H = 270, TILE = 16, DT = 1 / 60;
+export const VIEW_H = 270, TILE = 16, DT = 1 / 60;
+// View width adapts to the device aspect (16:9 desktop → ~21:9 phones).
+// Height stays fixed; wider screens simply see more of the world.
+export let VIEW_W = 480;
+export function fitViewWidth(aspect) {
+  VIEW_W = Math.max(480, Math.min(640, Math.round(VIEW_H * aspect / 2) * 2));
+  return VIEW_W;
+}
 
 export const PLAYER = {
   W: 20, H: 10,
