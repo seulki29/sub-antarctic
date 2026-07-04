@@ -1,19 +1,27 @@
-import { TILE, NODE_HP } from './constants.js';
+import { TILE, NODE_HP, HYDRO_ROW, STEAM } from './constants.js';
 
-export const T = { WATER: 0, ROCK: 1, VENT: 2, NODE: 3, HOLE: 4, CHECK: 5, BASE: 6, GATE: 7 };
+export const T = { WATER: 0, ROCK: 1, VENT: 2, NODE: 3, HOLE: 4, CHECK: 5, BASE: 6, GATE: 7, PBARRIER: 8 };
 
 const LEGEND = {
   '.': T.WATER, '#': T.ROCK, 'V': T.VENT, 'C': T.NODE, 'M': T.HOLE,
-  'K': T.CHECK, 'B': T.BASE, 'G': T.GATE,
+  'K': T.CHECK, 'B': T.BASE, 'G': T.GATE, 'P': T.PBARRIER,
   // entity-only markers (tile becomes water)
-  'J': T.WATER, 'F': T.WATER, 'A': T.WATER, 'W': T.WATER,
+  'J': T.WATER, 'F': T.WATER, 'A': T.WATER, 'W': T.WATER, 'H': T.WATER, 'Z': T.WATER,
 };
 
 function center(tx, ty) { return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }; }
 
-// mineral tier by depth: crystal < 18 <= pearl < 40 <= abyss (tile rows)
+// mineral tier by depth: crystal < 18 <= pearl < 40 <= abyss < HYDRO_ROW <= magma (tile rows)
 export function mineralForRow(tileY) {
-  return tileY < 18 ? 'crystal' : tileY < 40 ? 'pearl' : 'abyss';
+  return tileY < 18 ? 'crystal' : tileY < 40 ? 'pearl' : tileY < HYDRO_ROW ? 'abyss' : 'magma';
+}
+
+// deterministic per-vent steam cycle; seed offsets the phase
+export function steamPhase(time, seed) {
+  const period = STEAM.IDLE + STEAM.TELEGRAPH + STEAM.ERUPT;
+  const t = (time + ((seed % 97) / 97) * period) % period;
+  return t < STEAM.IDLE ? 'idle'
+    : t < STEAM.IDLE + STEAM.TELEGRAPH ? 'telegraph' : 'erupt';
 }
 
 export function parseMap(rows) {
@@ -22,6 +30,7 @@ export function parseMap(rows) {
     w, h, tiles: new Uint8Array(w * h), gateClosed: false,
     base: null, vents: [], nodes: [], holes: [], checkpoints: [],
     jelly: [], fishSpawns: [], angler: null, gates: [], decor: [],
+    pressure: [], hydroVents: [], crawler: null, hullOpen: false,
   };
   for (let ty = 0; ty < h; ty++) {
     for (let tx = 0; tx < w; tx++) {
@@ -38,6 +47,9 @@ export function parseMap(rows) {
       else if (ch === 'F') world.fishSpawns.push(c);
       else if (ch === 'A') world.angler = c;
       else if (ch === 'G') world.gates.push({ tx, ty });
+      else if (ch === 'P') world.pressure.push({ tx, ty });
+      else if (ch === 'H') world.hydroVents.push(c);
+      else if (ch === 'Z') world.crawler = c;
     }
   }
   genDecor(world, rows);
@@ -55,7 +67,8 @@ function dirFromWall(rows, tx, ty) {
 
 // deterministic glowing coral / kelp on floor tiles
 function genDecor(world, rows) {
-  const colors = ['#ff8c5a', '#ff6482', '#ffbe6e', '#aa78ff', '#78f0dc'];
+  const cool = ['#ff8c5a', '#ff6482', '#ffbe6e', '#aa78ff', '#78f0dc'];
+  const warm = ['#ff6a4a', '#ffd0c0', '#ff9a70', '#e05a5a']; // tube worms
   for (let ty = 1; ty < world.h; ty++) {
     for (let tx = 0; tx < world.w; tx++) {
       const solid = world.tiles[ty * world.w + tx] === T.ROCK;
@@ -63,10 +76,11 @@ function genDecor(world, rows) {
       if (!solid || !waterAbove) continue;
       const hsh = (tx * 73856093 ^ ty * 19349663) >>> 0;
       if (hsh % 100 < 22) {
+        const isPalette = ty >= HYDRO_ROW ? warm : cool;
         world.decor.push({
           x: tx * TILE + (hsh % TILE), y: ty * TILE,
           type: hsh % 3 === 0 ? 'kelp' : 'coral',
-          color: colors[hsh % colors.length],
+          color: isPalette[hsh % isPalette.length],
         });
       }
     }
@@ -76,7 +90,7 @@ function genDecor(world, rows) {
 export function isSolid(world, tx, ty) {
   if (tx < 0 || ty < 0 || tx >= world.w || ty >= world.h) return true;
   const t = world.tiles[ty * world.w + tx];
-  return t === T.ROCK || t === T.HOLE || (t === T.GATE && world.gateClosed);
+  return t === T.ROCK || t === T.HOLE || (t === T.GATE && world.gateClosed) || (t === T.PBARRIER && !world.hullOpen);
 }
 
 export function rectHitsSolid(world, x, y, w, h) {
@@ -122,13 +136,18 @@ function ventZone(v) {
 
 // difficulty post-pass: trim nodes/vents to target counts.
 // vents keep at least one per depth zone so O2 routes always exist.
+// magma nodes and deep vents (>= HYDRO_ROW) are always preserved.
 export function applyDifficulty(world, diff) {
-  world.nodes = pickEven(world.nodes, diff.nodes);
+  const fixedNodes = world.nodes.filter(n => n.kind === 'magma');
+  world.nodes = [...pickEven(world.nodes.filter(n => n.kind !== 'magma'), diff.nodes), ...fixedNodes];
+  const isDeep = v => Math.floor(v.y / TILE) >= HYDRO_ROW;
+  const fixedVents = world.vents.filter(isDeep);
+  const oldVents = world.vents.filter(v => !isDeep(v));
   const zones = [[], [], []];
-  for (const v of [...world.vents].sort((a, b) => a.x - b.x)) zones[ventZone(v)].push(v);
+  for (const v of [...oldVents].sort((a, b) => a.x - b.x)) zones[ventZone(v)].push(v);
   const kept = [];
   for (const z of zones) if (z.length) kept.push(z[0]);
-  const rest = world.vents.filter(v => !kept.includes(v));
+  const rest = oldVents.filter(v => !kept.includes(v));
   for (const v of pickEven(rest, Math.max(0, diff.vents - kept.length))) kept.push(v);
-  world.vents = kept;
+  world.vents = [...kept, ...fixedVents];
 }

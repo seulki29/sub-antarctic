@@ -23,6 +23,7 @@ export const UPGRADES = {
   lamp:   { cost: 10, label: 'LAMP +40' },
   fins:   { cost: 14, label: 'FINS SPEED' },
   suit:   { cost: 16, label: 'DIVE SUIT' },
+  hull:   { cost: 24, label: 'PRESSURE HULL' },
 };
 
 export const DIFFICULTY = {
@@ -35,6 +36,7 @@ export const MINERALS = {
   crystal: { value: 1, color: '#5ae0e6' },
   pearl:   { value: 3, color: '#f0dce6' },
   abyss:   { value: 5, color: '#ff8a5a' },
+  magma:   { value: 8, color: '#ffb040' },
 };
 
 export const ENEMY = {
@@ -51,3 +53,17 @@ export const BOSS = {
 
 export const LIGHT = { MAX: 12, LAMP_REACH: 150, LAMP_SPREAD: 0.5 };
 export const NODE_HP = 2, CRYSTALS_PER_NODE = 3;
+
+export const HYDRO_ROW = 68; // tile row where the hydrothermal biome starts
+
+export const STEAM = {
+  IDLE: 2.5, TELEGRAPH: 0.8, ERUPT: 1.2,
+  COLUMN_H: 48, COLUMN_W: 24,
+};
+
+export const CRAWLER = {
+  HP: 20, W: 70, H: 40, PATROL_SPD: 40,
+  LUNGE_SPD: 200, TELEGRAPH: 0.5, LUNGE_TIME: 0.8,
+  STEAM_CD_MIN: 4, STEAM_CD_MAX: 6,
+  CONTACT_DMG: 1, AGGRO_RANGE: 200, DROP: 12, GRAVITY: 300,
+};

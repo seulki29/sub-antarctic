@@ -70,16 +70,16 @@ export class UpgradeMenu {
 
   layout(player) {
     const keys = Object.keys(UPGRADES);
-    const bw = 190, bh = 24, x = (VIEW_W - bw) / 2;
+    const bw = 190, bh = 24, gap = 4, x = (VIEW_W - bw) / 2;
     const btns = keys.map((key, i) => {
       const u = UPGRADES[key];
       return {
-        key, x, y: 60 + i * (bh + 6), w: bw, h: bh,
+        key, x, y: 60 + i * (bh + gap), w: bw, h: bh,
         label: u.label, cost: u.cost,
         owned: player.upgrades[key], affordable: player.banked >= u.cost,
       };
     });
-    btns.push({ key: 'close', x, y: 60 + keys.length * (bh + 6), w: bw, h: 20, label: 'CLOSE' });
+    btns.push({ key: 'close', x, y: 60 + keys.length * (bh + gap), w: bw, h: 20, label: 'CLOSE' });
     return btns;
   }
 
