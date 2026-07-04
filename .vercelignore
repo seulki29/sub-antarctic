@@ -1,0 +1,7 @@
+docs
+samples
+tests
+.superpowers
+*.md
+package.json
+.gitignore
