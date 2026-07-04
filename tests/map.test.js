@@ -29,9 +29,9 @@ test('map dimensions 150x68, uniform rows', () => {
 test('required entities present', () => {
   const w = parseMap(MAP_ROWS);
   assert.ok(w.base, 'base exists');
-  assert.ok(w.vents.length >= 5, `vents ${w.vents.length}`);
+  assert.equal(w.vents.length, 8);
   assert.ok(w.checkpoints.length >= 2, `checkpoints ${w.checkpoints.length}`);
-  assert.equal(w.nodes.length, 12);
+  assert.equal(w.nodes.length, 16);
   assert.equal(w.holes.length, 4);
   assert.ok(w.jelly.length >= 8);
   assert.equal(w.fishSpawns.length, 3);
@@ -69,4 +69,14 @@ test('boss trigger box cannot be entered without passing the gate', () => {
     for (let tx = Math.max(0, x0); tx <= Math.min(w.w - 1, x1); tx++)
       assert.equal(seen[ty * w.w + tx], 0,
         `trigger-box tile (${tx},${ty}) reachable with gate closed — gate would close in front of the player`);
+});
+
+test('map vents and minerals cover all depth zones', () => {
+  const w = parseMap(MAP_ROWS);
+  const zone = pt => { const ty = Math.floor(pt.y / TILE); return ty < 18 ? 0 : ty < 40 ? 1 : 2; };
+  const vc = [0, 0, 0];
+  for (const v of w.vents) vc[zone(v)]++;
+  for (const c of vc) assert.ok(c >= 2, `vents per zone ${vc}`);
+  const kinds = new Set(w.nodes.map(n => n.kind));
+  assert.equal(kinds.size, 3, 'all three minerals present');
 });
