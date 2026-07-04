@@ -18,8 +18,23 @@ export const PLAYER = {
 };
 
 export const UPGRADES = {
-  tank:   { cost: 8,  label: 'O2 TANK +50'  },
+  tank:   { cost: 8,  label: 'O2 TANK +50' },
   damage: { cost: 12, label: 'HARPOON +50' },
+  lamp:   { cost: 10, label: 'LAMP +40' },
+  fins:   { cost: 14, label: 'FINS SPEED' },
+  suit:   { cost: 16, label: 'DIVE SUIT' },
+};
+
+export const DIFFICULTY = {
+  easy:   { hp: 5, nodes: 16, vents: 8 },
+  normal: { hp: 3, nodes: 12, vents: 5 },
+  hard:   { hp: 2, nodes: 9,  vents: 3 },
+};
+
+export const MINERALS = {
+  crystal: { value: 1, color: '#5ae0e6' },
+  pearl:   { value: 3, color: '#f0dce6' },
+  abyss:   { value: 5, color: '#ff8a5a' },
 };
 
 export const ENEMY = {

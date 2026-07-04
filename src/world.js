@@ -11,6 +11,11 @@ const LEGEND = {
 
 function center(tx, ty) { return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }; }
 
+// mineral tier by depth: crystal < 18 <= pearl < 40 <= abyss (tile rows)
+export function mineralForRow(tileY) {
+  return tileY < 18 ? 'crystal' : tileY < 40 ? 'pearl' : 'abyss';
+}
+
 export function parseMap(rows) {
   const h = rows.length, w = rows[0].length;
   const world = {
@@ -26,7 +31,7 @@ export function parseMap(rows) {
       const c = center(tx, ty);
       if (ch === 'B') world.base = c;
       else if (ch === 'V') world.vents.push(c);
-      else if (ch === 'C') world.nodes.push({ ...c, hp: NODE_HP });
+      else if (ch === 'C') world.nodes.push({ ...c, hp: NODE_HP, kind: mineralForRow(ty) });
       else if (ch === 'M') world.holes.push({ ...c, dir: dirFromWall(rows, tx, ty) });
       else if (ch === 'K') world.checkpoints.push(c);
       else if (ch === 'J') world.jelly.push(c);
@@ -101,3 +106,29 @@ export function moveAndCollide(world, e, dt) {
 }
 
 export function setGate(world, closed) { world.gateClosed = closed; }
+
+function pickEven(list, n) {
+  const sorted = [...list].sort((a, b) => a.x - b.x);
+  if (n >= sorted.length) return sorted;
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(sorted[Math.floor(i * sorted.length / n)]);
+  return out;
+}
+
+function ventZone(v) {
+  const ty = Math.floor(v.y / TILE);
+  return ty < 18 ? 0 : ty < 40 ? 1 : 2;
+}
+
+// difficulty post-pass: trim nodes/vents to target counts.
+// vents keep at least one per depth zone so O2 routes always exist.
+export function applyDifficulty(world, diff) {
+  world.nodes = pickEven(world.nodes, diff.nodes);
+  const zones = [[], [], []];
+  for (const v of [...world.vents].sort((a, b) => a.x - b.x)) zones[ventZone(v)].push(v);
+  const kept = [];
+  for (const z of zones) if (z.length) kept.push(z[0]);
+  const rest = world.vents.filter(v => !kept.includes(v));
+  for (const v of pickEven(rest, Math.max(0, diff.vents - kept.length))) kept.push(v);
+  world.vents = kept;
+}

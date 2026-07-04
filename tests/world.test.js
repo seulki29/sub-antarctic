@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { T, parseMap, isSolid, moveAndCollide, rectHitsSolid, setGate } from '../src/world.js';
+import { T, parseMap, isSolid, moveAndCollide, rectHitsSolid, setGate, mineralForRow, applyDifficulty } from '../src/world.js';
+import { DIFFICULTY } from '../src/constants.js';
 
 const SMALL = [
   '#####',
@@ -47,4 +48,37 @@ test('gate toggles solidity', () => {
   setGate(w, true);
   assert.equal(isSolid(w, 2, 1), true);
   assert.equal(rectHitsSolid(w, 33, 17, 10, 10), true);
+});
+
+test('mineralForRow zones', () => {
+  assert.equal(mineralForRow(0), 'crystal');
+  assert.equal(mineralForRow(17), 'crystal');
+  assert.equal(mineralForRow(18), 'pearl');
+  assert.equal(mineralForRow(39), 'pearl');
+  assert.equal(mineralForRow(40), 'abyss');
+});
+
+test('parseMap assigns mineral kind by depth', () => {
+  const w = parseMap(['####', '#C.#', '####']);
+  assert.equal(w.nodes[0].kind, 'crystal');
+});
+
+test('applyDifficulty trims counts and keeps vent zone coverage', () => {
+  const mkNodes = n => Array.from({ length: n }, (_, i) => ({ x: i * 100 + 8, y: 8, hp: 2, kind: 'crystal' }));
+  const vents = [
+    { x: 100, y: 5 * 16 }, { x: 800, y: 12 * 16 },   // upper
+    { x: 300, y: 25 * 16 }, { x: 1200, y: 30 * 16 }, // mid
+    { x: 500, y: 45 * 16 }, { x: 1500, y: 50 * 16 }, // deep
+    { x: 900, y: 9 * 16 }, { x: 2000, y: 55 * 16 },
+  ];
+  const hard = { nodes: mkNodes(16), vents: [...vents] };
+  applyDifficulty(hard, DIFFICULTY.hard);
+  assert.equal(hard.nodes.length, 9);
+  assert.equal(hard.vents.length, 3);
+  const zone = v => { const ty = Math.floor(v.y / 16); return ty < 18 ? 0 : ty < 40 ? 1 : 2; };
+  assert.equal(new Set(hard.vents.map(zone)).size, 3, 'one vent per zone on hard');
+  const easy = { nodes: mkNodes(16), vents: [...vents] };
+  applyDifficulty(easy, DIFFICULTY.easy);
+  assert.equal(easy.nodes.length, 16);
+  assert.equal(easy.vents.length, 8);
 });
