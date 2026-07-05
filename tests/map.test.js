@@ -104,3 +104,14 @@ test('map vents and minerals cover all depth zones', () => {
   const kinds = new Set(w.nodes.map(n => n.kind));
   assert.ok(kinds.size >= 3, 'all minerals present');
 });
+
+test('biome entrance is independent of the boss arena', () => {
+  const w = parseMap(MAP_ROWS);
+  setGate(w, true);      // boss fight sealed
+  w.hullOpen = true;     // hull purchased
+  const seen = floodFrom(w, Math.floor(w.base.x / TILE), Math.floor(w.base.y / TILE));
+  const reach = pt => seen[Math.floor(pt.y / TILE) * w.w + Math.floor(pt.x / TILE)] === 1;
+  for (const n of w.nodes.filter(n => n.kind === 'magma'))
+    assert.ok(reach(n), 'magma reachable with arena gate closed');
+  assert.ok(reach(w.crawler), 'crawler reachable with arena gate closed');
+});
