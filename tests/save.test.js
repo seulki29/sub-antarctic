@@ -36,7 +36,7 @@ test('applySave round-trips player and node state', () => {
   assert.equal(w2.nodes[0].hp, NODE_HP);
   assert.equal(w2.nodes[1].hp, 1);
   assert.equal(w2.nodes[2].hp, 0);
-  assert.deepEqual(flags, { bossDead: true, cleared: false });
+  assert.deepEqual(flags, { bossDead: true, cleared: false, hydroBossDead: false });
 });
 
 test('applySave ignores unknown node keys', () => {
@@ -50,4 +50,17 @@ test('isValidSave rejects bad versions and shapes', () => {
   assert.equal(isValidSave(null), false);
   assert.equal(isValidSave({ v: 2, difficulty: 'easy', banked: 0, upgrades: {}, nodesHp: {} }), false);
   assert.equal(isValidSave({ v: 1, difficulty: 'easy', banked: 0, upgrades: {}, nodesHp: {} }), true);
+});
+
+test('hydroBossDead round-trips and defaults false for old saves', () => {
+  const p = new Player(0, 0);
+  const s = buildSave('normal', p, fakeWorld(), false, false, true);
+  assert.equal(s.hydroBossDead, true);
+  const p2 = new Player(0, 0);
+  const flags = applySave(s, fakeWorld(), p2);
+  assert.equal(flags.hydroBossDead, true);
+  // old save without the field
+  const legacy = { v: 1, difficulty: 'easy', banked: 0, upgrades: {}, nodesHp: {}, bossDead: false, cleared: false };
+  const flags2 = applySave(legacy, fakeWorld(), new Player(0, 0));
+  assert.equal(flags2.hydroBossDead, false);
 });

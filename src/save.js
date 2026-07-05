@@ -2,7 +2,7 @@ import { NODE_HP } from './constants.js';
 
 const KEY = 'save';
 
-export function buildSave(diffKey, player, world, bossDead, cleared) {
+export function buildSave(diffKey, player, world, bossDead, cleared, hydroBossDead = false) {
   const nodesHp = {};
   for (const n of world.nodes)
     if (n.hp !== NODE_HP) nodesHp[`${n.x},${n.y}`] = n.hp;
@@ -14,6 +14,7 @@ export function buildSave(diffKey, player, world, bossDead, cleared) {
     nodesHp,
     bossDead: !!bossDead,
     cleared: !!cleared,
+    hydroBossDead: !!hydroBossDead,
   };
 }
 
@@ -33,7 +34,7 @@ export function applySave(save, world, player) {
     const hp = save.nodesHp[`${n.x},${n.y}`];
     if (hp !== undefined) n.hp = hp;
   }
-  return { bossDead: !!save.bossDead, cleared: !!save.cleared };
+  return { bossDead: !!save.bossDead, cleared: !!save.cleared, hydroBossDead: !!save.hydroBossDead };
 }
 
 export function storeSave(obj) {

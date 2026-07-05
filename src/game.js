@@ -1,6 +1,7 @@
-import { VIEW_W, VIEW_H, PLAYER as P, CRYSTALS_PER_NODE, ENEMY, BOSS, DIFFICULTY, MINERALS, STEAM } from './constants.js';
+import { VIEW_W, VIEW_H, PLAYER as P, CRYSTALS_PER_NODE, ENEMY, BOSS, CRAWLER, DIFFICULTY, MINERALS, STEAM } from './constants.js';
 import { Jellyfish, Moray, Fish } from './enemies.js';
 import { Angler } from './boss.js';
+import { Crawler } from './crawler.js';
 import { Lighting, glow } from './lighting.js';
 import { Particles } from './particles.js';
 import { MAP_ROWS } from './map.js';
@@ -51,6 +52,8 @@ export class GameScene {
     } : null;
     this.bossActive = false;
     this.relicDropped = false;
+    this.crawler = this.world.crawler ? new Crawler(this.world.crawler.x, this.world.crawler.y) : null;
+    this.crawlerAggro = false;
     this.deathTimer = 0;
     this.onClear = null;
     this.cleared = false;
@@ -63,6 +66,7 @@ export class GameScene {
         if (!this._resume.cleared)
           this.pickups.push({ kind: 'relic', x: this.world.angler.x, y: this.world.angler.y, vx: 0, vy: 0, t: 0 });
       }
+      if (this._resume.hydroBossDead && this.crawler) this.crawler.dead = true;
     }
     this.world.hullOpen = this.player.upgrades.hull;
   }
@@ -98,6 +102,7 @@ export class GameScene {
           this.boss.x = this.world.angler.x - this.boss.w / 2;
           this.boss.y = this.world.angler.y - this.boss.h / 2;
         }
+        if (this.crawler && !this.crawler.dead) this.crawler.reset();
       }
       return;
     }
@@ -185,6 +190,30 @@ export class GameScene {
       }
     }
 
+    if (this.crawler && !this.crawler.dead) {
+      const ccx = this.crawler.x + this.crawler.w / 2, ccy = this.crawler.y + this.crawler.h / 2;
+      this.crawlerAggro = Math.hypot(ccx - pcx, ccy - pcy) < CRAWLER.AGGRO_RANGE;
+      this.crawler.update(dt, this.world, this.player);
+      if (this.crawlerAggro) setBgmMode('boss');
+      else if (!this.bossActive) setBgmMode('calm');
+      const hit = this.harpoons.hitTest(this.crawler.rect());
+      if (hit) {
+        hit.dead = true;
+        this.crawler.takeDamage(hit.dmg);
+        this.particles.spawnSpark(ccx, ccy, '#ffc080');
+        sfx.hit();
+      }
+      if (this.crawler.dead) {
+        sfx.boom();
+        setBgmMode('calm');
+        for (let i = 0; i < CRAWLER.DROP; i++) {
+          const a = Math.random() * Math.PI * 2;
+          this.pickups.push({ kind: 'magma', x: ccx, y: ccy, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60 - 20, t: 0 });
+        }
+        storeSave(this._snapshot());
+      }
+    }
+
     // crystal nodes
     for (const n of this.world.nodes) {
       if (n.hp <= 0) continue;
@@ -249,7 +278,8 @@ export class GameScene {
 
   _snapshot() {
     return buildSave(this.diffKey, this.player, this.world,
-      this.boss ? this.boss.dead : false, this.cleared);
+      this.boss ? this.boss.dead : false, this.cleared,
+      this.crawler ? this.crawler.dead : false);
   }
 
   draw(ctx) {
@@ -305,6 +335,24 @@ export class GameScene {
         ctx.save(); ctx.translate(bx + bs.width, by); ctx.scale(-1, 1);
         ctx.drawImage(bs, 0, 0); ctx.restore();
       } else ctx.drawImage(bs, bx, by);
+    }
+
+    if (this.crawler && !this.crawler.dead) {
+      const cs = S.crawler;
+      const cx2 = Math.round(this.crawler.x - cam.x), cy2 = Math.round(this.crawler.y - cam.y);
+      if (this.crawler.facing === -1) {
+        ctx.save(); ctx.translate(cx2 + cs.width, cy2); ctx.scale(-1, 1);
+        ctx.drawImage(cs, 0, 0); ctx.restore();
+      } else ctx.drawImage(cs, cx2, cy2);
+      const s = this.crawler.steamRect();
+      if (s) {
+        ctx.fillStyle = 'rgba(255,190,130,0.4)';
+        ctx.fillRect(Math.round(s.x - cam.x), Math.round(s.y - cam.y), s.w, s.h);
+      }
+      if (this.crawler.state === 'telegraph' && Math.floor(this.time * 10) % 2) {
+        ctx.fillStyle = '#ff5a3a';
+        ctx.fillRect(cx2 + Math.round(cs.width / 2) - 1, cy2 - 6, 3, 3);
+      }
     }
 
     // steam columns
@@ -377,6 +425,8 @@ export class GameScene {
     drawHud(ctx, player);
     if (this.bossActive && this.boss && !this.boss.dead)
       drawBossBar(ctx, 'ABYSSAL ANGLER', this.boss.hp / BOSS.HP);
+    else if (this.crawlerAggro && this.crawler && !this.crawler.dead)
+      drawBossBar(ctx, 'VENT CRAWLER', this.crawler.hp / CRAWLER.HP);
     this.menu.draw(ctx, player);
     drawSticks(ctx, this.input);
     if (this.deathTimer > 0) {
