@@ -29,6 +29,7 @@ export class Crawler {
     this.vx = this.vy = 0;
     this.x = this.spawnX - this.w / 2; this.y = this.spawnY - this.h / 2;
     this.steamT = 0; this.steamCd = C.STEAM_CD_MIN;
+    this.dir = 1; this.facing = 1; this._lungeDir = 1;
   }
 
   steamRect() {
