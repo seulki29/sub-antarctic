@@ -1,10 +1,10 @@
-import { VIEW_W, VIEW_H, PLAYER as P, CRYSTALS_PER_NODE, ENEMY, BOSS, DIFFICULTY, MINERALS } from './constants.js';
+import { VIEW_W, VIEW_H, PLAYER as P, CRYSTALS_PER_NODE, ENEMY, BOSS, DIFFICULTY, MINERALS, STEAM } from './constants.js';
 import { Jellyfish, Moray, Fish } from './enemies.js';
 import { Angler } from './boss.js';
 import { Lighting, glow } from './lighting.js';
 import { Particles } from './particles.js';
 import { MAP_ROWS } from './map.js';
-import { parseMap, setGate, applyDifficulty } from './world.js';
+import { parseMap, setGate, applyDifficulty, steamPhase } from './world.js';
 import { Player } from './player.js';
 import { Input } from './input.js';
 import { bakeSprites } from './sprites.js';
@@ -64,6 +64,7 @@ export class GameScene {
           this.pickups.push({ kind: 'relic', x: this.world.angler.x, y: this.world.angler.y, vx: 0, vy: 0, t: 0 });
       }
     }
+    this.world.hullOpen = this.player.upgrades.hull;
   }
 
   update(dt) {
@@ -75,7 +76,7 @@ export class GameScene {
     if (this.menu.open) {
       if (this.input.consumeClick()) {
         const r = this.menu.click(this.input.pointer.x, this.input.pointer.y, this.player);
-        if (r === 'bought') { sfx.buy(); storeSave(this._snapshot()); } else if (r === null) sfx.denied();
+        if (r === 'bought') { sfx.buy(); storeSave(this._snapshot()); this.world.hullOpen = this.player.upgrades.hull; } else if (r === null) sfx.denied();
       }
       return; // pause world while menu open
     }
@@ -221,6 +222,20 @@ export class GameScene {
     this.cam.update(dt, this.player.x + this.player.w / 2,
                     this.player.y + this.player.h / 2, this.world);
     this.particles.update(dt, this.world, this.cam);
+    // hydrothermal steam vents
+    for (const v of this.world.hydroVents) {
+      if (Math.abs(v.x - pcx) > 320 || Math.abs(v.y - pcy) > 240) continue;
+      const ph = steamPhase(this.time, v.x * 7 + v.y * 13);
+      if (ph === 'erupt') {
+        const sr = { x: v.x - STEAM.COLUMN_W / 2, y: v.y - STEAM.COLUMN_H, w: STEAM.COLUMN_W, h: STEAM.COLUMN_H };
+        const pl = this.player;
+        if (!pl.dead && pl.x < sr.x + sr.w && pl.x + pl.w > sr.x && pl.y < sr.y + sr.h && pl.y + pl.h > sr.y)
+          pl.damage(1, v.x);
+        if (Math.random() < 0.4) this.particles.spawnSpark(v.x + (Math.random() - 0.5) * 10, v.y - Math.random() * STEAM.COLUMN_H, '#ffc080', 2);
+      } else if (ph === 'telegraph' && Math.random() < 0.2) {
+        this.particles.spawnBubble(v.x, v.y - 4, -40);
+      }
+    }
     this.bubbleTimer -= dt;
     if (this.bubbleTimer <= 0) {
       this.bubbleTimer = 0.9 + Math.random() * 0.6;
@@ -292,6 +307,19 @@ export class GameScene {
       } else ctx.drawImage(bs, bx, by);
     }
 
+    // steam columns
+    for (const v of world.hydroVents) {
+      const sx = Math.round(v.x - cam.x), sy = Math.round(v.y - cam.y);
+      if (sx < -20 || sx > VIEW_W + 20 || sy < -20 || sy > VIEW_H + STEAM.COLUMN_H) continue;
+      const ph = steamPhase(this.time, v.x * 7 + v.y * 13);
+      if (ph === 'erupt') {
+        ctx.fillStyle = 'rgba(255,190,130,0.35)';
+        ctx.fillRect(sx - STEAM.COLUMN_W / 2, sy - STEAM.COLUMN_H, STEAM.COLUMN_W, STEAM.COLUMN_H);
+        ctx.fillStyle = 'rgba(255,240,210,0.5)';
+        ctx.fillRect(sx - 4, sy - STEAM.COLUMN_H, 8, STEAM.COLUMN_H);
+      }
+    }
+
     // lighting
     const L = this.lighting;
     const dark = this.bossActive && this.boss && this.boss.phase2();
@@ -313,6 +341,14 @@ export class GameScene {
         decorLights++;
       }
     }
+    let steamLights = 0;
+    for (const v of world.hydroVents) {
+      if (steamLights >= 3) break;
+      if (Math.abs(v.x - px) < 280 && steamPhase(this.time, v.x * 7 + v.y * 13) === 'erupt') {
+        L.addPoint(v.x, v.y - 20, 44, '#ffb040', 0.7);
+        steamLights++;
+      }
+    }
     for (const e of this.enemies)
       if (e instanceof Jellyfish && Math.abs(e.x - px) < 260)
         L.addPoint(e.x + 7, e.y + 5, 26, '#be8cff', 0.4);
@@ -328,6 +364,16 @@ export class GameScene {
       glow(ctx, cam, lu.x, lu.y, 8, '#f0ffd0', this.boss.flash ? 0.4 : 0.9);
     }
     this.particles.draw(ctx, cam);
+    // pressure barrier warning
+    if (!player.upgrades.hull) {
+      const pcx2 = player.x + player.w / 2, pcy2 = player.y + player.h / 2;
+      for (const pt of world.pressure) {
+        if (Math.abs(pt.tx * 16 + 8 - pcx2) < 56 && Math.abs(pt.ty * 16 + 8 - pcy2) < 56) {
+          drawText(ctx, 'NEED PRESSURE HULL', (VIEW_W - textWidth('NEED PRESSURE HULL')) / 2, 60, '#ff8a6a');
+          break;
+        }
+      }
+    }
     drawHud(ctx, player);
     if (this.bossActive && this.boss && !this.boss.dead)
       drawBossBar(ctx, 'ABYSSAL ANGLER', this.boss.hp / BOSS.HP);
