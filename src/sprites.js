@@ -104,6 +104,7 @@ const GEM_TONES = {
   crystal: { dark: '#38b8c0', main: '#5ae0e6', hi: '#b8f8fa' },
   pearl:   { dark: '#c8a8b8', main: '#f0dce6', hi: '#ffffff' },
   abyss:   { dark: '#c04828', main: '#ff7a50', hi: '#ffd0a0' },
+  magma:   { dark: '#b84a10', main: '#ff9a30', hi: '#ffe0a0' },
 };
 
 function bakeGem(t) {
@@ -180,6 +181,21 @@ function bakeAngler() {
   return { canvas: c, lure: { x: cx - 54, y: cy - 64 } };
 }
 
+function bakeCrawler() {
+  const c = mk(70, 40), g = g2(c);
+  for (let i = 0; i < 4; i++)
+    poly(g, [[8 + i * 15, 34], [12 + i * 15, 24], [16 + i * 15, 34], [14 + i * 15, 39], [10 + i * 15, 39]], '#7a2818');
+  ell(g, 35, 22, 30, 14, '#a03820');
+  ell(g, 35, 18, 26, 10, '#c05028');
+  g.fillStyle = '#ffb040';
+  for (const [vx, vy] of [[24, 13], [34, 10], [44, 13]]) g.fillRect(vx, vy, 3, 3);
+  poly(g, [[2, 26], [11, 19], [11, 31]], '#a03820');
+  poly(g, [[68, 26], [59, 19], [59, 31]], '#a03820');
+  g.fillStyle = '#ffe0a0';
+  g.fillRect(27, 21, 2, 2); g.fillRect(41, 21, 2, 2);
+  return outline(c);
+}
+
 export function bakeSprites() {
   return {
     ...bakeDiver(),
@@ -187,6 +203,6 @@ export function bakeSprites() {
     gems: Object.fromEntries(Object.entries(GEM_TONES).map(([k, t]) => [k, bakeGem(t)])),
     nodes: Object.fromEntries(Object.entries(GEM_TONES).map(([k, t]) => [k, bakeNodeKind(t)])),
     relic: bakeRelic(),
-    rock: bakeRocks(), angler: bakeAngler(),
+    rock: bakeRocks(), angler: bakeAngler(), crawler: bakeCrawler(),
   };
 }

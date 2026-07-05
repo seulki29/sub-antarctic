@@ -13,7 +13,7 @@ export class Camera {
   }
 }
 
-const RAMP = ['#1c3464', '#12244c', '#0d1838', '#080e24', '#060918', '#04050e'];
+const RAMP = ['#1c3464', '#12244c', '#0d1838', '#080e24', '#060918', '#04050e', '#160a0a', '#2a1008'];
 
 export function drawBackground(ctx, cam, world) {
   const worldH = world.h * TILE;
@@ -63,6 +63,13 @@ export function drawTiles(ctx, cam, world, S) {
       else if (t === T.GATE && world.gateClosed) {
         ctx.fillStyle = '#28425a';
         ctx.fillRect(sx + 5, sy, 6, TILE);
+      }
+      else if (t === T.PBARRIER && !world.hullOpen) {
+        ctx.fillStyle = '#4a1018';
+        ctx.fillRect(sx, sy + 5, TILE, 6);
+        ctx.fillStyle = '#ff5a3a';
+        ctx.fillRect(sx + 2, sy + 7, 4, 2);
+        ctx.fillRect(sx + 10, sy + 7, 4, 2);
       }
       if (t === T.HOLE) {
         ctx.fillStyle = '#03040a';

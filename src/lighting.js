@@ -20,10 +20,12 @@ export class Lighting {
       g.fillRect(0, 0, VIEW_W, VIEW_H);
     } else {
       const worldH = world.h * TILE;
-      const aTop = ambientAt(cam.y, worldH), aBot = ambientAt(cam.y + VIEW_H, worldH);
+      const warmAt = y => Math.max(0, Math.min(1, (y / TILE - 60) / 20));
+      const aTop = ambientAt(cam.y, worldH) + warmAt(cam.y) * 0.08;
+      const aBot = ambientAt(cam.y + VIEW_H, worldH) + warmAt(cam.y + VIEW_H) * 0.08;
       const grad = g.createLinearGradient(0, 0, 0, VIEW_H);
-      grad.addColorStop(0, ambColor(aTop));
-      grad.addColorStop(1, ambColor(aBot));
+      grad.addColorStop(0, ambColor(aTop, warmAt(cam.y)));
+      grad.addColorStop(1, ambColor(aBot, warmAt(cam.y + VIEW_H)));
       g.fillStyle = grad;
       g.fillRect(0, 0, VIEW_W, VIEW_H);
     }
@@ -74,9 +76,11 @@ function ambientAt(worldY, worldH) {
   const t = Math.max(0, Math.min(1, worldY / worldH));
   return 0.75 - 0.63 * t; // 0.75 top → 0.12 bottom
 }
-function ambColor(a) {
-  const r = Math.round(190 * a), g = Math.round(215 * a), b = Math.round(255 * a);
-  return `rgb(${r},${g},${b})`;
+function ambColor(a, warm = 0) {
+  const r = Math.round((190 + 55 * warm) * a);
+  const gg = Math.round((215 - 45 * warm) * a);
+  const b = Math.round((255 - 130 * warm) * a);
+  return `rgb(${r},${gg},${b})`;
 }
 
 export function glow(ctx, cam, wx, wy, r, color, a = 0.8) {
