@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MAP_ROWS } from '../src/map.js';
 import { parseMap, isSolid, setGate } from '../src/world.js';
-import { TILE } from '../src/constants.js';
+import { TILE, HYDRO_ROW } from '../src/constants.js';
 
 function floodFrom(w, startTx, startTy) {
   const seen = new Uint8Array(w.w * w.h);
@@ -21,18 +21,18 @@ function floodFrom(w, startTx, startTy) {
   return seen;
 }
 
-test('map dimensions 150x68, uniform rows', () => {
-  assert.equal(MAP_ROWS.length, 68);
+test('map dimensions 150x100, uniform rows', () => {
+  assert.equal(MAP_ROWS.length, 100);
   for (const r of MAP_ROWS) assert.equal(r.length, 150);
 });
 
 test('required entities present', () => {
   const w = parseMap(MAP_ROWS);
   assert.ok(w.base, 'base exists');
-  assert.equal(w.vents.length, 8);
+  assert.equal(w.vents.length, 10);
   assert.ok(w.checkpoints.length >= 2, `checkpoints ${w.checkpoints.length}`);
-  assert.equal(w.nodes.length, 16);
-  assert.equal(w.holes.length, 4);
+  assert.equal(w.nodes.length, 22);
+  assert.equal(w.holes.length, 6);
   assert.ok(w.jelly.length >= 8);
   assert.equal(w.fishSpawns.length, 3);
   assert.ok(w.angler, 'boss exists');
@@ -44,7 +44,8 @@ test('all key points reachable from base (flood fill)', () => {
   const w = parseMap(MAP_ROWS);
   const seen = floodFrom(w, Math.floor(w.base.x / TILE), Math.floor(w.base.y / TILE));
   const reach = pt => seen[Math.floor(pt.y / TILE) * w.w + Math.floor(pt.x / TILE)] === 1;
-  for (const [name, list] of [['vent', w.vents], ['node', w.nodes], ['checkpoint', w.checkpoints], ['jelly', w.jelly], ['fish', w.fishSpawns]])
+  const oldRegion = pt => Math.floor(pt.y / TILE) < HYDRO_ROW;
+  for (const [name, list] of [['vent', w.vents.filter(oldRegion)], ['node', w.nodes.filter(n => n.kind !== 'magma')], ['checkpoint', w.checkpoints], ['jelly', w.jelly.filter(oldRegion)], ['fish', w.fishSpawns]])
     list.forEach((pt, i) => assert.ok(reach(pt), `${name}[${i}] reachable`));
   assert.ok(reach(w.angler), 'boss reachable');
 });
@@ -71,6 +72,29 @@ test('boss trigger box cannot be entered without passing the gate', () => {
         `trigger-box tile (${tx},${ty}) reachable with gate closed — gate would close in front of the player`);
 });
 
+test('hydro biome entities and hull gating', () => {
+  const w = parseMap(MAP_ROWS);
+  assert.equal(w.nodes.filter(n => n.kind === 'magma').length, 6);
+  assert.ok(w.hydroVents.length >= 6, `steam vents ${w.hydroVents.length}`);
+  assert.ok(w.pressure.length >= 3, 'pressure line spans corridor');
+  assert.ok(w.crawler, 'crawler spawn exists');
+  assert.ok(w.crawler.y >= HYDRO_ROW * TILE, 'crawler in biome');
+
+  // hull closed: biome unreachable
+  let seen = floodFrom(w, Math.floor(w.base.x / TILE), Math.floor(w.base.y / TILE));
+  const reach = pt => seen[Math.floor(pt.y / TILE) * w.w + Math.floor(pt.x / TILE)] === 1;
+  for (const n of w.nodes.filter(n => n.kind === 'magma'))
+    assert.equal(reach(n), false, 'magma node sealed');
+  assert.equal(reach(w.crawler), false, 'crawler sealed');
+
+  // hull open: everything reachable
+  w.hullOpen = true;
+  seen = floodFrom(w, Math.floor(w.base.x / TILE), Math.floor(w.base.y / TILE));
+  for (const n of w.nodes) assert.ok(reach(n), 'node reachable with hull');
+  for (const v of w.vents) assert.ok(reach(v), 'vent reachable with hull');
+  assert.ok(reach(w.crawler), 'crawler reachable with hull');
+});
+
 test('map vents and minerals cover all depth zones', () => {
   const w = parseMap(MAP_ROWS);
   const zone = pt => { const ty = Math.floor(pt.y / TILE); return ty < 18 ? 0 : ty < 40 ? 1 : 2; };
@@ -78,5 +102,5 @@ test('map vents and minerals cover all depth zones', () => {
   for (const v of w.vents) vc[zone(v)]++;
   for (const c of vc) assert.ok(c >= 2, `vents per zone ${vc}`);
   const kinds = new Set(w.nodes.map(n => n.kind));
-  assert.equal(kinds.size, 3, 'all three minerals present');
+  assert.ok(kinds.size >= 3, 'all minerals present');
 });
